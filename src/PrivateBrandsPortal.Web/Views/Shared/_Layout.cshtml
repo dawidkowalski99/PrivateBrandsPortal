@@ -1,0 +1,29 @@
+@inject PrivateBrandsPortal.Web.Interfaces.ICurrentUserService CurrentUser
+@{ var section = ViewContext.RouteData.Values["controller"]?.ToString(); }
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>@ViewData["Title"] · Private Brands</title>
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<link rel="stylesheet" href="~/css/site.css" asp-append-version="true" /></head>
+<body>
+<a class="skip-link" href="#main-content">Skip to content</a>
+<div class="portal-shell">
+<aside class="sidebar">
+<a class="brand" asp-controller="Dashboard" asp-action="Index"><span class="brand-mark">pb<span>·</span></span><span>Private Brands<small>PROJECT PORTAL</small></span></a>
+<div class="nav-label">WORKSPACE</div>
+<nav aria-label="Main navigation">
+@foreach (var item in new[] { ("Dashboard", "◫"), ("Projects", "▤"), ("Approvals", "✓"), ("Administration", "⚙") })
+{
+<a class="nav-item @(section == item.Item1 ? "active" : "")" asp-controller="@item.Item1" asp-action="Index" aria-current="@(section == item.Item1 ? "page" : null)"><span class="nav-icon" aria-hidden="true">@item.Item2</span>@item.Item1</a>
+}
+</nav>
+<div class="sidebar-bottom"><span class="avatar" aria-hidden="true">PB</span><div class="user-details"><strong>@CurrentUser.DisplayName</strong><small>@CurrentUser.RoleLabel</small></div></div>
+</aside>
+<div class="workspace">
+<header class="topbar"><div><span class="breadcrumb-root">Workspace</span><span class="breadcrumb-divider">/</span><strong>@ViewData["Title"]</strong></div><span class="secure-label"><span></span>Windows SSO</span></header>
+<main id="main-content" class="main-content" tabindex="-1">@RenderBody()</main>
+<footer class="portal-footer"><span>Private Brands · Internal workspace</span><span>Foundation / Stage 01</span></footer>
+</div></div>
+@await RenderSectionAsync("Scripts", required: false)
+</body></html>

@@ -1,0 +1,8 @@
+@{ ViewData["Title"] = "Administration"; }
+<div class="page-heading"><div><p class="eyebrow">A WORKSPACE THAT GROWS WITH YOU</p><h1>Administration</h1><p>Maintain the people and reference data behind your projects.</p></div><span class="stage-badge">Coming in Stage 07</span></div>
+<div class="admin-grid">
+@foreach (var area in new[] { ("Users", "Application access, roles and departments.", "◎"), ("Product Types", "A flexible catalog of product categories.", "▦"), ("Countries", "Markets available for customer briefs.", "⊕") })
+{
+<section class="panel admin-card"><span class="empty-icon" aria-hidden="true">@area.Item3</span><h2>@area.Item1</h2><p>@area.Item2</p><span class="subtle-badge">Not enabled yet</span></section>
+}
+</div>
