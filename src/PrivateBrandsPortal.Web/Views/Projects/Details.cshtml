@@ -1,0 +1,13 @@
+@model ProjectDetailsViewModel
+@using PrivateBrandsPortal.Web.Models.Enums
+@{ ViewData["Title"] = Model.ProjectNumber; }
+@if(TempData["Success"] is string message){<div class="alert alert-success" role="status">@message</div>}
+<div class="page-heading"><div><p class="eyebrow">PROJECT DETAILS</p><h1>@Model.ProjectNumber <span class="stage-badge">@Html.DisplayFor(x=>x.Status)</span></h1><p>@Model.Customer</p></div>
+@if(Model.Status == ProjectStatus.Draft){<a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit Draft</a>}
+</div>
+<section class="panel form-panel"><h2>Brief</h2><dl class="brief-grid"><div><dt>Customer</dt><dd>@Model.Customer</dd></div><div><dt>Country</dt><dd>@Model.Country</dd></div><div><dt>Project Manager</dt><dd>@Model.ProjectManager</dd></div><div><dt>Created (UTC)</dt><dd>@Model.CreatedAtUtc.ToString("dd.MM.yyyy HH:mm")</dd></div><div><dt>Last Updated (UTC)</dt><dd>@Model.UpdatedAtUtc.ToString("dd.MM.yyyy HH:mm")</dd></div></dl></section>
+<div class="section-heading"><h2>Products <span class="subtle-badge">@Model.Products.Count</span></h2></div>
+<div class="product-grid">@foreach(var product in Model.Products){<article class="panel product-card"><partial name="_ProductData" model="product" /></article>}</div>
+<div class="totals panel"><div><span>Number of Products</span><strong>@Model.Products.Count</strong></div><div><span>Total Estimated Value</span><strong>@Model.Products.Sum(x=>x.EstimatedValue).ToString("N2") <small>PLN</small></strong></div></div>
+<a asp-action="Index" class="btn btn-outline-secondary">← Back to Projects</a>
+

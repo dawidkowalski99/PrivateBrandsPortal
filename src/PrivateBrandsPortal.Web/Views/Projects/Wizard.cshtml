@@ -1,0 +1,82 @@
+@model WizardViewModel
+@using PrivateBrandsPortal.Web.Models.Enums
+@{ ViewData["Title"] = Model.Draft.ProjectId.HasValue ? "Edit Draft" : "New Project"; }
+<div class="page-heading"><div><p class="eyebrow">BUILD YOUR NEXT PRIVATE BRAND</p><h1>@ViewData["Title"]</h1><p>Start with a brief. Bring your products together.</p></div><span class="subtle-badge">Draft workspace</span></div>
+<ol class="wizard-steps" aria-label="Project creation progress">
+@foreach (var item in new[] { (1, "Brief"), (2, "Products"), (3, "Summary") })
+{
+<li class="@(Model.Step == item.Item1 ? "current" : Model.Step > item.Item1 ? "complete" : "")" aria-current="@(Model.Step == item.Item1 ? "step" : null)"><span>@(Model.Step > item.Item1 ? "✓" : item.Item1.ToString())</span>@item.Item2</li>
+}
+</ol>
+<p class="wizard-note">Changes stay in this workspace until you save. Unsaved work expires after 2 hours of inactivity or a server restart.</p>
+<div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+@if (Model.Step == 1)
+{
+<form asp-action="Brief" method="post" class="panel form-panel">
+<input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" />
+<div class="section-intro"><span class="eyebrow">STEP 01</span><h2>The customer brief</h2><p>Who are we creating this project for?</p></div>
+<div class="form-grid">
+<div class="field"><label asp-for="Brief.Customer"></label><input asp-for="Brief.Customer" class="form-control" maxlength="200" required placeholder="Customer or company name" /><span asp-validation-for="Brief.Customer"></span></div>
+<div class="field"><label asp-for="Brief.CountryId"></label><select asp-for="Brief.CountryId" class="form-select" required><option value="">Select country</option>@foreach(var country in Model.Countries){<option value="@country.Id">@country.Name</option>}</select><span asp-validation-for="Brief.CountryId"></span></div>
+</div>
+<div class="form-actions"><a asp-action="Index" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary" type="submit">Next →</button></div>
+</form>
+}
+@if (Model.Step == 2)
+{
+<div class="section-heading"><div><h2>Products <span class="subtle-badge">@Model.Draft.Products.Count</span></h2><p>Add the products included in this brief.</p></div><a class="btn btn-primary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2" asp-route-add="true">+ Add Product</a></div>
+@if (Model.ShowProductForm)
+{
+<form asp-action="Product" method="post" class="panel form-panel product-editor" id="product-editor">
+<input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" /><input type="hidden" asp-for="Product.Key" />
+<div class="section-intro"><h2>@(Model.Draft.Products.Any(x=>x.Key==Model.Product.Key) ? "Edit product" : "Add a product")</h2><p>All fields are required. Use a comma or dot for decimal values.</p></div>
+<div class="form-grid">
+<div class="field"><label asp-for="Product.ProductTypeId"></label><select asp-for="Product.ProductTypeId" class="form-select" required><option value="">Select product type</option>@foreach(var type in Model.ProductTypes){<option value="@type.Id">@type.Name</option>}</select><span asp-validation-for="Product.ProductTypeId"></span></div>
+<div class="field"><label asp-for="Product.SKU"></label><input asp-for="Product.SKU" class="form-control" maxlength="100" required /><span asp-validation-for="Product.SKU"></span></div>
+<div class="field"><label asp-for="Product.Quantity"></label><input asp-for="Product.Quantity" class="form-control" type="number" min="1" max="2147483647" step="1" required /><span asp-validation-for="Product.Quantity"></span></div>
+<div class="field"><label asp-for="Product.EstimatedValue"></label><div class="input-group"><input asp-for="Product.EstimatedValue" class="form-control decimal-input" type="text" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" /><span class="input-group-text">PLN</span></div><span asp-validation-for="Product.EstimatedValue"></span></div>
+<div class="field"><label asp-for="Product.EstimatedMargin"></label><div class="input-group"><input asp-for="Product.EstimatedMargin" class="form-control decimal-input" type="text" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" /><span class="input-group-text">%</span></div><span asp-validation-for="Product.EstimatedMargin"></span></div>
+<div class="field"><label asp-for="Product.FormulaStatus"></label><select asp-for="Product.FormulaStatus" asp-items="Html.GetEnumSelectList<FormulaStatus>()" class="form-select" required><option value="">Select formula</option></select><span asp-validation-for="Product.FormulaStatus"></span></div>
+</div>
+<div class="form-actions"><a class="btn btn-outline-secondary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2">Cancel product edit</a><button type="submit" class="btn btn-primary">Save product</button></div>
+</form>
+}
+<div class="product-grid">
+@foreach (var product in Model.Draft.Products)
+{
+<article class="panel product-card">
+<partial name="_ProductData" model="Model.Card(product)" />
+<div class="card-actions"><a class="btn btn-outline-secondary btn-sm" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2" asp-route-edit="@product.Key">Edit</a>
+<form asp-action="Remove" method="post" data-confirm="Remove product?"><input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" /><input type="hidden" name="key" value="@product.Key" /><button type="submit" class="btn btn-outline-danger btn-sm">Remove</button></form></div>
+</article>
+}
+</div>
+@if(Model.Draft.Products.Count == 0)
+{
+<section class="panel empty-state"><span class="empty-icon">▦</span><h3>Add your first product</h3><p>Choose a product type and add its quantities and estimates.<br />At least one product is required to continue.</p></section>
+}
+<div class="form-actions"><a class="btn btn-outline-secondary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="1">Back</a>
+@if(Model.Draft.Products.Count > 0){<a class="btn btn-primary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="3">Continue to Summary →</a>}
+else {<button class="btn btn-primary" disabled>Continue to Summary →</button>}
+</div>
+}
+@if (Model.Step == 3)
+{
+<section class="panel form-panel"><p class="eyebrow">BRIEF</p><h2>Ready to save your draft</h2><dl class="brief-grid"><div><dt>Customer</dt><dd>@Model.Draft.Brief.Customer</dd></div><div><dt>Country</dt><dd>@(Model.Countries.FirstOrDefault(x=>x.Id==Model.Draft.Brief.CountryId)?.Name ?? "Country unavailable")</dd></div><div><dt>Project Manager</dt><dd>@Model.ProjectManager</dd></div></dl></section>
+<div class="section-heading"><h2>Products</h2><span class="subtle-badge">Pending review</span></div>
+<div class="product-grid">
+@foreach(var product in Model.Draft.Products)
+{
+<article class="panel product-card"><partial name="_ProductData" model="Model.Card(product)" /></article>
+}
+</div>
+<div class="totals panel"><div><span>Number of Products</span><strong>@Model.Draft.Products.Count</strong></div><div><span>Total Estimated Value</span><strong>@Model.Draft.Products.Sum(x=>x.EstimatedValue).GetValueOrDefault().ToString("N2") <small>PLN</small></strong></div></div>
+<form asp-action="Save" method="post" class="form-actions"><input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" /><a class="btn btn-outline-secondary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2">Back</a><button type="submit" class="btn btn-primary">Save Draft</button></form>
+}
+@section Scripts {
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<partial name="_ValidationScriptsPartial" />
+<script src="~/js/project-wizard.js" asp-append-version="true"></script>
+}
+
+

@@ -1,0 +1,10 @@
+@model ProductCardViewModel
+<h3>@Model.ProductType</h3>
+<dl class="product-data">
+<div class="wide"><dt>SKU</dt><dd>@Model.SKU</dd></div>
+<div><dt>Quantity</dt><dd>@Model.Quantity.ToString("N0")</dd></div>
+<div><dt>Estimated Value</dt><dd>@Model.EstimatedValue.ToString("N2") <small>PLN</small></dd></div>
+<div><dt>Estimated Margin</dt><dd>@Model.EstimatedMargin.ToString("N2")%</dd></div>
+<div><dt>Formula</dt><dd>@Html.DisplayFor(x => x.FormulaStatus)</dd></div>
+</dl>
+

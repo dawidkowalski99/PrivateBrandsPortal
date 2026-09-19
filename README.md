@@ -4,7 +4,7 @@ Wewnętrzny portal działu Marek Prywatnych: ASP.NET Core MVC, Razor Views,
 EF Core i SQL Server, Windows Authentication, docelowo IIS w sieci firmowej.
 Interfejs jest po angielsku zgodnie z nazwami ekranów i pól w wymaganiach.
 
-## Stan: ETAP 2 — model i migracja gotowe, baza oczekuje konfiguracji
+## Stan: ETAP 3 — tworzenie i edycja Draftów
 
 Gotowe: solution, projekt MVC .NET 10, ApplicationDbContext, konfiguracja SQL,
 Windows SSO, polityki autoryzacji, responsywny sidebar/topbar, Dashboard oraz
@@ -13,12 +13,50 @@ są lokalne; aplikacja nie potrzebuje CDN. Własny CSS nie wymaga procesu npm.
 
 Dodano siedem encji biznesowych, osobne konfiguracje EF, migrację
 InitialBusinessSchema, deterministyczny seed słowników i generator numerów.
-Nie ma jeszcze formularzy, operacji administracyjnych ani workflow.
-Kreski na Dashboardzie oznaczają brak danych, a nie rzeczywiste liczniki.
-Brak connection stringa nadal nie blokuje stron informacyjnych.
+Projects obsługuje wizard Brief → Products → Summary → Save Draft,
+szczegóły, listę własnych projektów i Edit Draft. Nie ma jeszcze Submit,
+decyzji Managera ani CRUD Administration. Kreski na Dashboardzie pozostają
+informacyjnym szkieletem, a nie rzeczywistymi licznikami.
 Nie wykonujemy migracji ani połączeń SQL automatycznie podczas startu.
-PrivateBrandsPortal_DEV NIE została utworzona: brakuje potwierdzonego endpointu
-SQL (instancji lub portu) i ConnectionStrings:DefaultConnection.
+PrivateBrandsPortal_DEV istnieje; zastosowano InitialBusinessSchema i zweryfikowano
+5 krajów, 4 typy produktów oraz sekwencję numeracji. Połączenie pozostaje w
+User Secrets, poza repozytorium. ETAP 3 nie zmienia schematu ani migracji.
+
+## Wizard i zapis Draftu
+
+WizardStore przechowuje w pamięci serwera wyłącznie DTO, bez encji EF.
+Każdy wizard ma losowy token, właściciela AppUser i numer rewizji.
+Oddzielne kreatory mają oddzielne tokeny; otwarcie tego samego tokenu w dwóch
+kartach podlega kontroli rewizji i blokadzie operacji dla tego wizardu.
+Token nie zastępuje autoryzacji: każde żądanie sprawdza właściciela.
+
+Brief oraz Add/Edit/Remove produktu korzystają z POST + antiforgery
+i przekierowania po sukcesie. Odświeżenie zachowuje zaakceptowany stan,
+ale nie niezapisane znaki w formularzu. Limit to 500 produktów w wizardzie,
+1000 aktywnych wizardów w procesie, 2 godziny bezczynności i maksymalnie 8 godzin.
+Restart lub usunięcie z cache traci niezapisany stan; UI pokazuje komunikat
+Workspace unavailable. Zapisane Drafty można ponownie otworzyć z SQL.
+Przy skalowaniu na wiele procesów potrzebny będzie wspólny magazyn stanu;
+obecna wersja jest przeznaczona dla jednego procesu aplikacji.
+
+ProjectService nadaje numer dopiero przy pierwszym Save Draft poprzez
+istniejący IProjectNumberGenerator i dbo.ProjectNumberSequence.
+Projekt i wszystkie produkty zapisuje w jednej transakcji SQL.
+Powtórzenie Save tego samego aktywnego wizardu kieruje do zapisanego projektu.
+Edycja zachowuje numer i identyfikatory istniejących produktów; UpdatedAtUtc
+jest porównywane w warunkowym UPDATE w tej samej transakcji. Nieaktualny
+wizard nie nadpisuje nowszego Draftu. To nie jest jeszcze interfejs rozwiązywania
+konfliktów — należy ponownie otworzyć Draft.
+
+ProjectService wymaga aktywnego ProjectManagera i filtruje każdy odczyt,
+edycję i zapis po ProjectManagerId. Manager/Admin nie otrzymują w tym etapie
+domyślnego dostępu do projektów innych osób. ReviewStatus pozostaje Pending;
+projekt z danymi review nie może być zmieniany tą ścieżką.
+
+Formularze korzystają z ViewModels, walidacji serwerowej i klienckiej.
+DecimalModelBinder centralnie przyjmuje przecinek lub kropkę, bez separatorów
+tysięcy. UI formatuje liczby według pl-PL; pieniądze w PLN, maks. 2 miejsca
+dziesiętne, marża 0–100%. Wyświetlane daty są jawnie oznaczone UTC.
 
 ## Wymagania i środowisko
 
@@ -70,9 +108,9 @@ nie wyłączaj uwierzytelniania w kodzie. Zwykłe uruchomienie nie wymaga konta 
 ## Konfiguracja bazy i sekretów
 
 Klucz: ConnectionStrings:DefaultConnection. W appsettings.json celowo jest pusty.
-Nie potwierdzono nazwy instancji ani portu SQL — NIE zakładamy SQLEXPRESS.
-Przed pierwszym połączeniem ustal z IT dokładny endpoint, sposób
-uwierzytelniania i certyfikat SQL. Dla certyfikatu należy użyć zgodnej nazwy DNS.
+Endpoint DEV został potwierdzony i skonfigurowany w User Secrets.
+Na nowym komputerze uzyskaj od IT ten sam endpoint i uprawnienia Windows;
+nie zakładaj SQLEXPRESS. Dla certyfikatu należy użyć zgodnej nazwy DNS.
 
 Baza development: PrivateBrandsPortal_DEV. Produkcja: PrivateBrandsPortal.
 Poniższy endpoint jest placeholderem, który trzeba zastąpić:
@@ -145,7 +183,7 @@ Po 9999 liczba rośnie bez obcinania cyfr. Licznik jest globalny i NIE resetuje
 się z początkiem roku. Wycofanie transakcji lub rezerwacja bez zapisu może
 pozostawić lukę — numeracja nie jest ciągłym rejestrem księgowym.
 Unikalny indeks ProjectNumber stanowi dodatkowe zabezpieczenie.
-W ETAPIE 3 serwis tworzenia projektu wywoła generator i przypisze wynik;
+W ETAPIE 3 serwis tworzenia projektu wywołuje generator i przypisuje wynik;
 samo new Project ani Add nie rezerwuje numeru. Nie używamy MAX(Id)+1.
 Testy sprawdzają format i konfigurację sekwencji; nie wykonano jeszcze
 testu współbieżności na fizycznym SQL Server.
@@ -187,7 +225,7 @@ W produkcji migracje stosuje się kontrolowanie po przeglądzie i backupie,
 odrębnym kontem wdrożeniowym, a nie automatycznie z konta aplikacji.
 Po aktualizacji uruchom w SSMS scripts/verify-dev-schema.sql, aby sprawdzić
 tabele, wpis migracji, 5 krajów, 4 typy produktów, sekwencję i FK.
-Na razie tych operacji na serwerze nie wykonano. Nie używamy EnsureCreated,
+Migrację i weryfikację wykonano na DEV. Nie używamy EnsureCreated,
 SQLite ani automatycznego update podczas startu.
 
 ## Pierwszy Admin development
@@ -199,8 +237,8 @@ PrivateBrandsPortal_DEV, używa transakcji i odmawia zmian, jeśli istnieje już
 wskazane konto lub dowolny Admin. Nie podnosi uprawnień istniejącego użytkownika.
 Nie zapisuj rzeczywistego loginu w repozytorium. Skrypt nie został wykonany
 i nie jest mechanizmem automatycznego tworzenia użytkowników produkcyjnych.
-Utworzenie profilu nie włącza jeszcze ekranów administracyjnych: mapowanie
-aktywnego AppUser na claim roli zostanie podłączone przed operacjami biznesowymi.
+Utworzenie profilu Admin nie włącza ekranów administracyjnych ani nie nadaje
+dostępu ProjectManagera — ETAP 3 obejmuje wyłącznie własne Drafty ProjectManagera.
 
 ## Uwierzytelnianie i autoryzacja
 
@@ -210,13 +248,15 @@ bezpieczna strona błędu; pliki statyczne nie zawierają danych użytkowników.
 
 PortalAuthorization definiuje ReviewProjects (Manager, Admin) i
 AdministerPortal (Admin), wykorzystując oddzielny claim privatebrands:role.
-Nie przypisujemy ról automatycznie i nie utożsamiamy grup AD z rolami aplikacji.
-Dlatego obecnie obok konta widnieje Role not assigned.
-CurrentUserService centralizuje DomainLogin i IsAuthenticated; odczyt tożsamości
-nie wymaga zapytania SQL. Model AppUser jest gotowy, ale ETAP 2 nie podłącza
-jeszcze mapowania kont do uprawnień i nie nadaje claimów automatycznie.
-W kolejnych etapach aktywny AppUser będzie źródłem uprawnień; nieaktywne
-i niezarejestrowane konta nie mogą uzyskać dostępu do operacji biznesowych.
+Nie utożsamiamy grup AD z rolami aplikacji. CurrentUserService centralizuje
+DomainLogin i IsAuthenticated. AppUserService mapuje zalogowane konto na AppUser.
+Wyłącznie w Development brakujący profil tworzy się jako aktywny ProjectManager;
+unikalny indeks loginu i obsługa kolizji chronią przed duplikatami.
+Production odmawia dostępu nieznanemu profilowi. Nieaktywne konta nie są
+reaktywowane ani awansowane automatycznie. Brak loginów i haseł w kodzie.
+ProjectAccessFilter oraz ProjectService sprawdzają aktualny profil z bazy,
+a nie tylko widoczność przycisków. Na stronach Projects sidebar pokazuje
+rolę odczytanego profilu; nie wdrożono jeszcze globalnego nadawania claimów.
 
 Informacyjne szkielety Approvals i Administration są teraz dostępne wszystkim
 uwierzytelnionym. Przed dodaniem danych i operacji należy nałożyć odpowiednie
@@ -224,7 +264,7 @@ polityki na endpointy i kontrolować widoczność menu. Ukrycie linku nie stanow
 autoryzacji. Nie istnieje development bypass ani testowy login w projekcie Web.
 
 MVC globalnie sprawdza antiforgery dla metod modyfikujących dane.
-Przyszłe formularze Razor muszą korzystać z Form Tag Helper / AntiForgeryToken,
+Formularze Razor korzystają z Form Tag Helper / AntiForgeryToken,
 ViewModels i walidacji po stronie serwera.
 Globalna obsługa wyjątków pokazuje jedynie komunikat i identyfikator zgłoszenia;
 własny ILogger zapisuje typ błędu i identyfikator, bez treści requestu,
@@ -268,7 +308,7 @@ trafi do serwisów. Daty biznesowe będą przechowywane w UTC.
 
 ## Testy
 
-38 testów: 14 testów fundamentu oraz 24 testy modelu i usług.
+64 testy: zachowane 38 testów fundamentu/modelu oraz 26 testów ETAPU 3.
 Zachowano odrzucanie anonimowych żądań, renderowanie czterech stron bez bazy,
 provider SQL Server, polityki ról (w tym brak uprawnień wynikających z grupy
 Windows o nazwie Admin), bezpieczną i niecache'owaną stronę błędu.
@@ -280,14 +320,32 @@ TestServer nie obsługuje kontekstu połączeń Negotiate, więc tylko projekt
 testowy zastępuje uwierzytelnianie handlerem testowym.
 Rzeczywiste SSO wymaga dodatkowego testu na Kestrelu / IIS z kontem domenowym.
 
+WizardTests sprawdzają walidację, liczby, izolację stanu i CSRF.
+ProjectSqlTests korzystają z rzeczywistego SQL Server przez User Secrets
+projektu Web. Wymagają bazy PrivateBrandsPortal_DEV i odmawiają pracy z inną
+nazwą bazy. Tworzą unikalne profile PORTALTEST i projekty, po czym usuwają
+wyłącznie własne rekordy. Nie modyfikują słowników ani schematu.
+Sprawdzają mapowanie profilu, odmowę provisioningu Production, nieaktywność,
+zapis wielu produktów, ownership/IDOR, edycję, konflikt wersji i rollback.
+Testy zużywają wartości sekwencji — luki w numeracji są oczekiwane.
+
 ```powershell
-.\dotnet.ps1 test PrivateBrandsPortal.sln --logger "trx;LogFileName=stage2.trx" --results-directory artifacts/TestResults
+.\dotnet.ps1 test PrivateBrandsPortal.sln --logger "trx;LogFileName=stage3.trx" --results-directory artifacts/TestResults
 ```
 
 Weryfikacja ETAPU 1: build bez błędów i ostrzeżeń; 14/14 testów;
 Kestrel wystartował, anonimowy HTTP 401 + Negotiate, Windows SSO HTTP 200.
 Dashboard sprawdzono w przeglądarce desktop i przy szerokości 390 px.
 Nie testowano połączenia SQL ani wdrożenia na docelowym IIS.
+
+Weryfikacja ETAPU 3 (17.09.2026): build 0 błędów / 0 ostrzeżeń,
+64/64 testy, w tym integracja SQL Server. Manualnie sprawdzono Windows SSO,
+Brief → Products → Summary, dodawanie / edycję / usuwanie kart, Back,
+odświeżenie, Save Draft, Details oraz listę projektów na desktop i mobile.
+Pozostawiono DEV Draft PB-2026-0005 (Demo Customer, Germany): dwa produkty,
+245 000 PLN, oba Pending. Edit Draft zmienił ilość Shampoo z 20 000 na
+22 000, zachowując numer projektu i aktualizując UpdatedAtUtc.
+Schemat i InitialBusinessSchema pozostały bez zmian; nowa migracja nie była potrzebna.
 
 ## Przygotowanie IIS
 
@@ -321,7 +379,7 @@ Nie testowano połączenia SQL ani wdrożenia na docelowym IIS.
    anonimowych żądań. SQL Express musi mieć skonfigurowany właściwy endpoint
    TCP i reguły zapory; nie otwieraj portów na podstawie założonej nazwy instancji.
 
-Na tym etapie nie wykonano zmian DNS, IIS ani SQL na serwerze firmowym.
+Nie wykonano zmian DNS ani IIS. Zmiany SQL dotyczą wyłącznie bazy DEV.
 
 Dokumentacja Microsoft:
 - [Windows Authentication](https://learn.microsoft.com/aspnet/core/security/authentication/windowsauth?view=aspnetcore-10.0)
@@ -330,9 +388,6 @@ Dokumentacja Microsoft:
 
 ## Następny etap — wyłącznie po poleceniu
 
-ETAP 3: wizard Brief → Products → Summary, ViewModels z walidacją,
-serwis tworzenia projektu z generatorem numeru i Save Draft.
-Przed operacjami biznesowymi trzeba uruchomić bazę i podłączyć kontrolowane
-mapowanie aktywnego AppUser do ról. Submit i decyzje Managera pozostają
-w późniejszych etapach. ETAPU 3 jeszcze nie rozpoczęto.
+ETAP 4: Submit for Approval i reguły przejścia statusów, wyłącznie po osobnym
+poleceniu. W obecnej wersji nie ma Submit, review Managera ani powiadomień.
 

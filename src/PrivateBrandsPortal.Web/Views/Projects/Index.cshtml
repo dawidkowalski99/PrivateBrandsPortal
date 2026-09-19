@@ -1,3 +1,12 @@
+@model IReadOnlyList<ProjectListItemViewModel>
 @{ ViewData["Title"] = "Projects"; }
-<div class="page-heading"><div><p class="eyebrow">FROM BRIEF TO DELIVERY</p><h1>Projects</h1><p>Your customer briefs and product portfolio.</p></div></div>
-<section class="panel"><div class="panel-heading"><h2>My projects</h2><span class="subtle-badge">Coming in Stage 03</span></div><div class="empty-state"><span class="empty-icon" aria-hidden="true">▤</span><h3>A home for every brief</h3><p>Project number, customer, country, status and product count<br />will be available here once project creation is enabled.</p></div></section>
+<div class="page-heading"><div><p class="eyebrow">FROM BRIEF TO DELIVERY</p><h1>Projects</h1><p>Your customer briefs and product portfolio.</p></div><a class="btn btn-primary" asp-action="Create">+ New Project</a></div>
+<section class="panel">
+<div class="panel-heading"><h2>My projects</h2><span class="subtle-badge">@Model.Count projects</span></div>
+@if(Model.Count == 0){<div class="empty-state"><span class="empty-icon">▤</span><h3>No projects yet</h3><p>Create your first Private Brands project.</p><a class="btn btn-primary" asp-action="Create">+ New Project</a></div>}
+else {
+<div class="table-responsive"><table class="table project-table"><thead><tr><th>Project Number</th><th>Customer / Country</th><th>Created (UTC)</th><th>Status</th><th>Products</th><th>Estimated Value</th><th>Last Update (UTC)</th><th></th></tr></thead><tbody>
+@foreach(var project in Model){<tr><td><a asp-action="Details" asp-route-id="@project.Id">@project.ProjectNumber</a></td><td><strong>@project.Customer</strong><small>@project.Country</small></td><td>@project.CreatedAtUtc.ToString("dd.MM.yyyy")</td><td><span class="stage-badge">@Html.DisplayFor(_=>project.Status)</span></td><td>@project.ProductCount</td><td class="text-nowrap">@project.EstimatedValue.ToString("N2") PLN</td><td>@project.UpdatedAtUtc.ToString("dd.MM.yyyy HH:mm")</td><td><a asp-action="Details" asp-route-id="@project.Id">View</a></td></tr>}
+</tbody></table></div>
+}
+</section>
