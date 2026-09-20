@@ -9,7 +9,7 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> b)
     {
-        b.ToTable("AuditLogs", t => t.HasCheckConstraint("CK_AuditLogs_ChangeType", "[ChangeType] IN ('Created','Updated','Deleted')"));
+        b.ToTable("AuditLogs", t => t.HasCheckConstraint("CK_AuditLogs_ChangeType", "[ChangeType] IN ('Created','Updated','Deleted','ManagerEdit','ProjectSubmitted')"));
         b.HasKey(x => x.Id);
         b.Property(x => x.EntityType).IsRequired().HasMaxLength(100);
         b.Property(x => x.FieldName).IsRequired().HasMaxLength(100);
@@ -21,4 +21,3 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         b.HasIndex(x => new { x.EntityType, x.EntityId, x.ChangedAtUtc });
     }
 }
-

@@ -1,0 +1,12 @@
+@model ProjectDetailsViewModel
+@using PrivateBrandsPortal.Web.Models.Enums
+@{ ViewData["Title"] = "Review " + Model.ProjectNumber; var reviewed = Model.Products.Count(x => x.ReviewStatus != ProductReviewStatus.Pending); }
+@if(TempData["Success"] is string success){<div class="alert alert-success" role="status">@success</div>}
+@if(TempData["Error"] is string error){<div class="alert alert-danger" role="alert">@error</div>}
+<div class="page-heading"><div><p class="eyebrow">MANAGER REVIEW</p><h1>@Model.ProjectNumber</h1><p>@Model.Customer · @Model.Country</p></div><span class="stage-badge">@Html.DisplayFor(x => x.Status)</span></div>
+<section class="panel form-panel"><dl class="brief-grid"><div><dt>Project Manager</dt><dd>@Model.ProjectManager</dd></div><div><dt>Submitted (UTC)</dt><dd>@Model.SubmittedAtUtc?.ToString("dd.MM.yyyy HH:mm")</dd></div></dl><p>Reviewed @reviewed / @Model.Products.Count</p><progress class="review-progress" value="@reviewed" max="@Math.Max(1,Model.Products.Count)" aria-label="Products reviewed"></progress></section>
+<div class="product-grid">@foreach(var product in Model.Products){<article class="panel product-card">
+<partial name="~/Views/Projects/_ProductData.cshtml" model="product" /><partial name="_ProductReview" model="product" />
+@if(product.ReviewStatus == ProductReviewStatus.Pending && Model.Status is ProjectStatus.AwaitingManagerReview or ProjectStatus.PartiallyReviewed){
+<div class="card-actions"><a class="btn btn-primary" asp-action="Decision" asp-route-projectId="@Model.Id" asp-route-productId="@product.Id" asp-route-decision="Approved">Approve</a><a class="btn btn-outline-danger" asp-action="Decision" asp-route-projectId="@Model.Id" asp-route-productId="@product.Id" asp-route-decision="Rejected">Reject</a><a class="btn btn-outline-secondary" asp-action="Decision" asp-route-projectId="@Model.Id" asp-route-productId="@product.Id" asp-route-decision="EditedAndApproved">Edit &amp; Approve</a></div>}
+</article>}</div><a class="btn btn-outline-secondary" asp-action="Index">Back to Approvals</a>

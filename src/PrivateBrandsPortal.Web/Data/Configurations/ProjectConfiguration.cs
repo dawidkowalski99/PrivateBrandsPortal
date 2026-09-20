@@ -10,7 +10,7 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
     public void Configure(EntityTypeBuilder<Project> b)
     {
         b.ToTable("Projects", t => t.HasCheckConstraint("CK_Projects_Status",
-            "[Status] IN ('Draft','AwaitingManagerReview','PartiallyReviewed','Approved','Rejected','InProgress','Completed','Cancelled')"));
+            "[Status] IN ('Draft','AwaitingManagerReview','PartiallyReviewed','Approved','Rejected','InProgress','Completed','Cancelled','PartiallyApproved')"));
         b.HasKey(x => x.Id);
         b.Property(x => x.ProjectNumber).IsRequired().HasMaxLength(32).IsUnicode(false);
         b.HasIndex(x => x.ProjectNumber).IsUnique();
@@ -22,4 +22,3 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
     }
 }
-

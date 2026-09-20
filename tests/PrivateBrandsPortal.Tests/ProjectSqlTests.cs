@@ -35,7 +35,7 @@ public sealed class ProjectSqlTests
         public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
-    private sealed class Scope : IAsyncDisposable
+    internal sealed class Scope : IAsyncDisposable
     {
         public string Login { get; } = $"PORTALTEST\\{Guid.NewGuid():N}";
         public string Connection { get; }
@@ -67,6 +67,8 @@ public sealed class ProjectSqlTests
         {
             await using var clean = NewContext();
             var ids = clean.AppUsers.Where(x => x.DomainLogin == Login).Select(x => x.Id);
+            await clean.AuditLogs.Where(x => ids.Contains(x.ChangedByUserId)).ExecuteDeleteAsync();
+            await clean.ProductReviews.Where(x => ids.Contains(x.ReviewerId) || ids.Contains(x.ProjectProduct.Project.ProjectManagerId)).ExecuteDeleteAsync();
             await clean.ProjectProducts.Where(x => ids.Contains(x.Project.ProjectManagerId)).ExecuteDeleteAsync();
             await clean.Projects.Where(x => ids.Contains(x.ProjectManagerId)).ExecuteDeleteAsync();
             await clean.AppUsers.Where(x => x.DomainLogin == Login).ExecuteDeleteAsync();

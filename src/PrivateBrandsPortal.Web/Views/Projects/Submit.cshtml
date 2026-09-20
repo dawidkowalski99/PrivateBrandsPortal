@@ -1,0 +1,8 @@
+@model ProjectDetailsViewModel
+@{ ViewData["Title"] = "Submit for Approval"; }
+<section class="panel form-panel">
+<p class="eyebrow">MANAGER REVIEW</p><h1>Submit project @Model.ProjectNumber for manager review?</h1>
+<p>After submission, the project can no longer be freely edited by the Project Manager.</p>
+<form asp-action="Submit" method="post"><input type="hidden" name="id" value="@Model.Id" /><input type="hidden" name="version" value="@Model.UpdatedAtUtc.ToString("O")" />
+<div class="form-actions"><a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary" type="submit">Submit</button></div></form>
+</section>

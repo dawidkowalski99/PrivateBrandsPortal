@@ -8,13 +8,27 @@ namespace PrivateBrandsPortal.Web.Controllers;
 
 [ServiceFilter(typeof(ProjectAccessFilter))]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store) : Controller
+public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals) : Controller
 {
     public async Task<IActionResult> Index(CancellationToken ct) => View(await projects.ListAsync(ct));
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
         var model = await projects.DetailsAsync(id, ct);
         return model is null ? NotFound() : View(model);
+    }
+    [HttpGet]
+    public async Task<IActionResult> Submit(int id, CancellationToken ct)
+    {
+        var project = await projects.DetailsAsync(id, ct);
+        return project is null || project.Status != Models.Enums.ProjectStatus.Draft ? NotFound() : View(project);
+    }
+    [HttpPost, ActionName("Submit")]
+    public async Task<IActionResult> SubmitConfirmed(int id, DateTimeOffset? version, CancellationToken ct)
+    {
+        if (!version.HasValue || !ModelState.IsValid) return BadRequest();
+        try { await approvals.SubmitAsync(id, version.Value, ct); TempData["Success"] = "Project submitted for manager review."; }
+        catch (ValidationException ex) { TempData["Error"] = ex.Message; }
+        return RedirectToAction(nameof(Details), new { id });
     }
     public async Task<IActionResult> Create(CancellationToken ct)
     {
@@ -31,7 +45,11 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
     private async Task<IActionResult> With(Guid token, CancellationToken ct, Func<WizardState, Task<IActionResult>> action)
     {
         var user = await users.GetCurrentAsync(ct);
-        return await store.WithAsync(token, user.Id, action, ct) ?? View("Expired");
+        return await store.WithAsync(token, user.Id, async state => {
+            if (!state.SavedProjectId.HasValue && state.Draft.ProjectId is int id && await projects.LoadDraftAsync(id, ct) is null)
+                return (IActionResult)Forbid();
+            return await action(state);
+        }, ct) ?? View("Expired");
     }
     private async Task<IActionResult> Page(WizardState state, int step, CancellationToken ct,
         ProductInput? product = null, bool showProduct = false)

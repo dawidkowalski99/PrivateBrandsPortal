@@ -18,6 +18,9 @@ builder.Services.Configure<RequestLocalizationOptions>(o =>
 });
 builder.Services.AddScoped<IAppUserService, AppUserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ManagerAuthorization>();
+
 builder.Services.AddScoped<ProjectAccessFilter>();
 builder.Services.AddSingleton<WizardStore>();
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
@@ -46,4 +49,3 @@ app.MapControllerRoute("default", "{controller=Dashboard}/{action=Index}/{id?}")
 app.Run();
 
 public partial class Program { }
-

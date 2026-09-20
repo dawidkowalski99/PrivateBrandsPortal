@@ -20,5 +20,6 @@ public enum ProjectStatus
     Completed = 6,
     [Display(Name = "Cancelled")]
     Cancelled = 7,
+    [Display(Name = "Partially Approved")]
+    PartiallyApproved = 8,
 }
-

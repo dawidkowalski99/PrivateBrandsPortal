@@ -10,5 +10,8 @@ public enum AuditChangeType
     Updated = 2,
     [Display(Name = "Deleted")]
     Deleted = 3,
+    [Display(Name = "Manager edit")]
+    ManagerEdit = 4,
+    [Display(Name = "Project submitted")]
+    ProjectSubmitted = 5,
 }
-

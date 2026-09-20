@@ -12,6 +12,7 @@ public sealed class AppUserService(ApplicationDbContext db, ICurrentUserService 
 {
     public async Task<AppUser> GetCurrentAsync(CancellationToken cancellationToken = default)
     {
+        if (accessor.HttpContext?.Items["PortalAppUser"] is AppUser cached) return cached;
         var login = current.DomainLogin;
         if (!current.IsAuthenticated || string.IsNullOrWhiteSpace(login) || login.Length > 256)
             throw new PortalAccessException();
@@ -39,4 +40,3 @@ public sealed class AppUserService(ApplicationDbContext db, ICurrentUserService 
         return user;
     }
 }
-

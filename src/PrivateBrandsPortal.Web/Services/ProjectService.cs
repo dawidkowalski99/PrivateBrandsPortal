@@ -36,14 +36,8 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     public async Task<ProjectDetailsViewModel?> DetailsAsync(int id, CancellationToken ct = default)
     {
         var user = await OwnerAsync(ct);
-        return await db.Projects.AsNoTracking().Where(x => x.Id == id && x.ProjectManagerId == user.Id)
-            .Select(x => new ProjectDetailsViewModel {
-                Id = x.Id, ProjectNumber = x.ProjectNumber, Customer = x.Customer, Country = x.Country.Name,
-                ProjectManager = x.ProjectManager.DisplayName, Status = x.Status,
-                CreatedAtUtc = x.CreatedAtUtc, UpdatedAtUtc = x.UpdatedAtUtc,
-                Products = x.Products.OrderBy(p => p.Id).Select(p => new ProductCardViewModel(
-                    p.ProductType.Name, p.SKU, p.Quantity, p.EstimatedValue, p.EstimatedMargin, p.FormulaStatus)).ToList()
-            }).SingleOrDefaultAsync(ct);
+        return await ProjectDetailsReader.ReadAsync(db,
+            db.Projects.Where(x => x.Id == id && x.ProjectManagerId == user.Id), ct);
     }
     public async Task<DraftInput?> LoadDraftAsync(int id, CancellationToken ct = default)
     {
@@ -135,4 +129,3 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
         return project.Id;
     }
 }
-

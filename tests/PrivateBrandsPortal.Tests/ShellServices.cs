@@ -3,10 +3,10 @@ using PrivateBrandsPortal.Web.Models.Entities;
 using PrivateBrandsPortal.Web.ViewModels;
 namespace PrivateBrandsPortal.Tests;
 
-internal sealed class ShellAppUser : IAppUserService
+internal sealed class ShellAppUser(Microsoft.AspNetCore.Http.IHttpContextAccessor accessor) : IAppUserService
 {
     public Task<AppUser> GetCurrentAsync(CancellationToken ct = default) =>
-        Task.FromResult(new AppUser { Id = 1, DomainLogin = "TEST\\reader", DisplayName = "Test reader" });
+        Task.FromResult(new AppUser { Id = 1, DomainLogin = "TEST\\reader", DisplayName = "Test reader", Role = accessor.HttpContext?.Request.Headers["X-Test-AppRole"].ToString() == "Manager" ? PrivateBrandsPortal.Web.Models.Enums.AppRole.Manager : PrivateBrandsPortal.Web.Models.Enums.AppRole.ProjectManager });
 }
 internal sealed class ShellProjects : IProjectService
 {

@@ -4,18 +4,17 @@ Wewnętrzny portal działu Marek Prywatnych: ASP.NET Core MVC, Razor Views,
 EF Core i SQL Server, Windows Authentication, docelowo IIS w sieci firmowej.
 Interfejs jest po angielsku zgodnie z nazwami ekranów i pól w wymaganiach.
 
-## Stan: ETAP 3 — tworzenie i edycja Draftów
+## Stan: ETAP 4 — Manager Approval workflow
 
 Gotowe: solution, projekt MVC .NET 10, ApplicationDbContext, konfiguracja SQL,
 Windows SSO, polityki autoryzacji, responsywny sidebar/topbar, Dashboard oraz
-informacyjne strony Projects, Approvals i Administration. Zasoby Bootstrap
+moduły Projects i Approvals oraz szkielet Administration. Zasoby Bootstrap
 są lokalne; aplikacja nie potrzebuje CDN. Własny CSS nie wymaga procesu npm.
 
 Dodano siedem encji biznesowych, osobne konfiguracje EF, migrację
 InitialBusinessSchema, deterministyczny seed słowników i generator numerów.
 Projects obsługuje wizard Brief → Products → Summary → Save Draft,
-szczegóły, listę własnych projektów i Edit Draft. Nie ma jeszcze Submit,
-decyzji Managera ani CRUD Administration. Kreski na Dashboardzie pozostają
+szczegóły, listę własnych projektów, Edit Draft oraz Submit. Approvals obsługuje decyzje Managera i historię zmian. Nie ma jeszcze CRUD Administration. Kreski na Dashboardzie pozostają
 informacyjnym szkieletem, a nie rzeczywistymi licznikami.
 Nie wykonujemy migracji ani połączeń SQL automatycznie podczas startu.
 PrivateBrandsPortal_DEV istnieje; zastosowano InitialBusinessSchema i zweryfikowano
@@ -247,7 +246,7 @@ Fallback policy wymaga zalogowania na wszystkich stronach. Wyjątkiem jest
 bezpieczna strona błędu; pliki statyczne nie zawierają danych użytkowników.
 
 PortalAuthorization definiuje ReviewProjects (Manager, Admin) i
-AdministerPortal (Admin), wykorzystując oddzielny claim privatebrands:role.
+AdministerPortal (Admin), odczytując role z aktywnego AppUser. ManagerReview dopuszcza wyłącznie Managera.
 Nie utożsamiamy grup AD z rolami aplikacji. CurrentUserService centralizuje
 DomainLogin i IsAuthenticated. AppUserService mapuje zalogowane konto na AppUser.
 Wyłącznie w Development brakujący profil tworzy się jako aktywny ProjectManager;
@@ -255,13 +254,9 @@ unikalny indeks loginu i obsługa kolizji chronią przed duplikatami.
 Production odmawia dostępu nieznanemu profilowi. Nieaktywne konta nie są
 reaktywowane ani awansowane automatycznie. Brak loginów i haseł w kodzie.
 ProjectAccessFilter oraz ProjectService sprawdzają aktualny profil z bazy,
-a nie tylko widoczność przycisków. Na stronach Projects sidebar pokazuje
-rolę odczytanego profilu; nie wdrożono jeszcze globalnego nadawania claimów.
+a nie tylko widoczność przycisków. Sidebar pokazuje rolę odczytanego profilu.
 
-Informacyjne szkielety Approvals i Administration są teraz dostępne wszystkim
-uwierzytelnionym. Przed dodaniem danych i operacji należy nałożyć odpowiednie
-polityki na endpointy i kontrolować widoczność menu. Ukrycie linku nie stanowi
-autoryzacji. Nie istnieje development bypass ani testowy login w projekcie Web.
+Approvals wymaga polityki ManagerReview. Informacyjny szkielet Administration pozostaje dostępny uwierzytelnionym, bez operacji administracyjnych. Ukrycie linku nie stanowi autoryzacji. Nie istnieje development bypass ani testowy login w projekcie Web.
 
 MVC globalnie sprawdza antiforgery dla metod modyfikujących dane.
 Formularze Razor korzystają z Form Tag Helper / AntiForgeryToken,
@@ -388,6 +383,72 @@ Dokumentacja Microsoft:
 
 ## Następny etap — wyłącznie po poleceniu
 
-ETAP 4: Submit for Approval i reguły przejścia statusów, wyłącznie po osobnym
-poleceniu. W obecnej wersji nie ma Submit, review Managera ani powiadomień.
+Kolejne działy, ponowne wysyłanie odrzuconych produktów i powiadomienia wymagają osobnego polecenia.
 
+
+
+## Manager Approval — ETAP 4
+
+Submit na Project Details wymaga potwierdzenia oraz POST z antiforgery.
+ApprovalService sprawdza właściciela, aktywnego ProjectManagera, status Draft,
+wersję projektu, minimum jeden poprawny produkt oraz aktywne słowniki.
+Transakcja ustawia AwaitingManagerReview, SubmittedAtUtc i UpdatedAtUtc,
+zachowuje produkty Pending oraz zapisuje AuditLog ProjectSubmitted.
+Po Submit Edit Draft i operacje starego, otwartego wizardu są blokowane na backendzie.
+
+Windows/AD odpowiada za authentication. Wszystkie polityki biznesowe odczytują
+aktywnego AppUser; nie ufają przychodzącym claims ról ani grupom AD.
+ManagerReview wymaga dokładnie roli Manager. Istniejące polityki ReviewProjects
+(Manager/Admin) i AdministerPortal (Admin) zachowują zakres ról.
+AppUser jest cache'owany wyłącznie w bieżącym żądaniu; zmiana roli w bazie
+obowiązuje od kolejnego requestu. Sidebar pokazuje DisplayName, a przy jego
+braku DomainLogin. Approvals badge wykonuje jeden Count na żądanie Managera.
+
+Kolejka zawiera AwaitingManagerReview i PartiallyReviewed z Pending,
+posortowane według SubmittedAtUtc, potem Id. Manager widzi wszystkie takie
+projekty; przydział do konkretnego Managera nie jest częścią tego etapu.
+Approve ma ekran potwierdzenia; Reject wymaga niepustego komentarza (do 2000 znaków).
+Edit & Approve udostępnia Product Type, SKU, Quantity, Estimated Value,
+Estimated Margin i Formula, z tą samą walidacją liczb co wizard.
+
+Każda decyzja tworzy nowy ProductReview z autorem, UTC i komentarzem.
+Każde faktycznie zmienione pole tworzy osobny AuditLog ManagerEdit
+z pełnymi OldValue/NewValue. W SQL liczby audytu są zapisane invariant;
+UI formatuje je lokalnie i pokazuje przekreśloną starą wartość, nową wartość,
+autora oraz czas. ProductTypeId przechowuje stabilne ID; UI rozwiązuje nazwę
+ze słownika (także dla nieaktywnych typów). Nie nadpisujemy wcześniejszej historii.
+
+Decyzja, zmiany danych, audyt i status projektu są jedną transakcją.
+Porównanie UpdatedAtUtc i warunkowy UPDATE projektu blokują równoległe decyzje,
+a wersja i status produktu blokują powtórne/stare decyzje. Konflikt wymaga
+ponownego otwarcia review; dane nie są nadpisywane po cichu.
+
+Status centralnie wylicza ApprovalService.CalculateStatus:
+- wszystkie Pending: AwaitingManagerReview;
+- część Pending: PartiallyReviewed;
+- wszystkie Approved/EditedAndApproved: Approved;
+- wszystkie Rejected: Rejected;
+- zakończone mieszane decyzje: PartiallyApproved.
+
+Migracja 20260919144934_ManagerApprovalWorkflow rozszerza wyłącznie dwa
+ograniczenia CHECK (Projects.Status i AuditLogs.ChangeType). InitialBusinessSchema
+pozostaje bez zmian. Migracja została zastosowana w DEV. Cofnięcie jej wymaga
+uprzedniego rozwiązania danych używających nowych statusów — Down nie kasuje historii.
+
+DEV helper: scripts/set-dev-user-role.sql. W lokalnej kopii podaj DomainLogin
+istniejącego aktywnego AppUser i rolę Manager lub ProjectManager. Skrypt odmawia
+pracy poza PrivateBrandsPortal_DEV, dla nieistniejącego konta i dla Admina.
+Nie wpisuj rzeczywistych loginów do repozytorium. Nie twórz równoległych ról w AD.
+
+Manualny test 19–20.09.2026: PB-2026-0052 (Approval Demo, Sweden).
+Shampoo Approved; Body Lotion EditedAndApproved: Quantity 5000 → 6000,
+EstimatedMargin 25 → 27.5, dokładnie dwa wpisy ManagerEdit.
+Dodatkowy Conditioner odrzucony z komentarzem; pusta przyczyna była blokowana.
+Wynik PartiallyApproved, Reviewed 3/3, projekt znika z kolejki.
+Rolę konta użytego do testu przywrócono do ProjectManager.
+PB-2026-0005 pozostaje przykładowym Draftem i nie został zmieniony.
+
+Końcowa weryfikacja ETAPU 4: build 0 błędów / 0 ostrzeżeń, 91/91 testów.
+Sprawdzono desktop i mobile 390 px, SSO, odczyt historii i blokady HTTP:
+Projects/Edit po Submit 404, Approvals dla ProjectManagera 403. Logi bez nowych błędów.
+Strona błędu pomija zapytania badge do SQL, także dla zalogowanego użytkownika.

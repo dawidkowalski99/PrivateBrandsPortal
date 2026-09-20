@@ -15,7 +15,7 @@
 <nav aria-label="Main navigation">
 @foreach (var item in new[] { ("Dashboard", "◫"), ("Projects", "▤"), ("Approvals", "✓"), ("Administration", "⚙") })
 {
-<a class="nav-item @(section == item.Item1 ? "active" : "")" asp-controller="@item.Item1" asp-action="Index" aria-current="@(section == item.Item1 ? "page" : null)"><span class="nav-icon" aria-hidden="true">@item.Item2</span>@item.Item1</a>
+<a class="nav-item @(section == item.Item1 ? "active" : "")" asp-controller="@item.Item1" asp-action="Index" aria-current="@(section == item.Item1 ? "page" : null)"><span class="nav-icon" aria-hidden="true">@item.Item2</span>@item.Item1@if(item.Item1 == "Approvals") {<span class="nav-count">@await Component.InvokeAsync("ApprovalsBadge")</span>}</a>
 }
 </nav>
 <div class="sidebar-bottom"><span class="avatar" aria-hidden="true">PB</span><div class="user-details"><strong>@CurrentUser.DisplayName</strong><small>@CurrentUser.RoleLabel</small></div></div>

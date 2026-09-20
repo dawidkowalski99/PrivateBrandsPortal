@@ -1,3 +1,7 @@
+@model IReadOnlyList<PrivateBrandsPortal.Web.ViewModels.ApprovalItem>
 @{ ViewData["Title"] = "Approvals"; }
-<div class="page-heading"><div><p class="eyebrow">MOVE PROJECTS FORWARD</p><h1>Approvals</h1><p>A dedicated workspace for manager decisions.</p></div></div>
-<section class="panel"><div class="panel-heading"><h2>Awaiting review</h2><span class="subtle-badge">Coming in Stage 05</span></div><div class="empty-state"><span class="empty-icon" aria-hidden="true">✓</span><h3>Every product, its own decision</h3><p>Submitted projects and individual product decisions will appear here.<br />Review actions are not enabled in this stage.</p></div></section>
+<div class="page-heading"><div><p class="eyebrow">MANAGER WORKSPACE</p><h1>Approvals</h1><p>Awaiting review · oldest submissions first.</p></div><span class="subtle-badge">@Model.Count projects</span></div>
+@if(Model.Count == 0){<section class="panel empty-state"><h2>All caught up</h2><p>No projects awaiting your review.</p></section>}
+<div class="product-grid">
+@foreach(var p in Model){<article class="panel product-card"><h2>@p.ProjectNumber</h2><p>@p.Customer · @p.Country</p><p class="stage-badge">@Html.DisplayFor(_ => p.Status)</p><dl class="product-data"><div><dt>Project Manager</dt><dd>@p.ProjectManager</dd></div><div><dt>Submitted (UTC)</dt><dd>@p.SubmittedAtUtc?.ToString("dd.MM.yyyy HH:mm")</dd></div></dl><p>Reviewed @p.Reviewed / @p.Products products</p><a class="btn btn-primary" asp-action="Review" asp-route-id="@p.Id">Review</a></article>}
+</div>

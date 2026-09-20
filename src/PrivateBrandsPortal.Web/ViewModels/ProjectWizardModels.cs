@@ -72,6 +72,7 @@ public sealed class ProjectListItemViewModel
 }
 public sealed class ProjectDetailsViewModel
 {
+    public DateTimeOffset? SubmittedAtUtc { get; set; }
     public int Id { get; set; }
     public string ProjectNumber { get; set; } = "";
     public string Customer { get; set; } = "";
@@ -83,6 +84,12 @@ public sealed class ProjectDetailsViewModel
     public List<ProductCardViewModel> Products { get; set; } = [];
 }
 public sealed record ProductCardViewModel(string ProductType, string SKU, int Quantity,
-    decimal EstimatedValue, decimal EstimatedMargin, FormulaStatus FormulaStatus);
-
-
+    decimal EstimatedValue, decimal EstimatedMargin, FormulaStatus FormulaStatus)
+{
+    public int Id { get; init; }
+    public int ProductTypeId { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; init; }
+    public ProductReviewStatus ReviewStatus { get; init; }
+    public List<ReviewHistoryItem> Reviews { get; init; } = [];
+    public List<ManagerChange> Changes { get; init; } = [];
+}

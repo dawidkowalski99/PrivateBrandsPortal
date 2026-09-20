@@ -1,0 +1,22 @@
+@model ReviewFormModel
+@using PrivateBrandsPortal.Web.Models.Enums
+@{ ViewData["Title"] = Model.Input.Decision switch { ReviewDecision.Approved => "Approve product", ReviewDecision.Rejected => "Reject product", _ => "Edit & Approve" }; }
+<div class="page-heading"><div><p class="eyebrow">@Model.Project.ProjectNumber</p><h1>@ViewData["Title"]</h1><p>Confirm your decision for this product. Saved decisions cannot be changed in this review round.</p></div></div>
+<form asp-action="Decision" method="post" class="panel form-panel">
+<div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+<input type="hidden" asp-for="Input.ProjectId" /><input type="hidden" asp-for="Input.ProductId" /><input type="hidden" name="Input.ProjectVersion" value="@Model.Input.ProjectVersion?.ToString("O")" /><input type="hidden" name="Input.ProductVersion" value="@Model.Input.ProductVersion?.ToString("O")" /><input type="hidden" asp-for="Input.Decision" />
+@if(Model.Input.Decision == ReviewDecision.EditedAndApproved){
+<div class="form-grid">
+<div class="field"><label asp-for="Input.Product!.ProductTypeId"></label><select asp-for="Input.Product!.ProductTypeId" class="form-select" required><option value="">Select product type</option>@foreach(var type in Model.ProductTypes){<option value="@type.Id">@type.Name</option>}</select><span asp-validation-for="Input.Product!.ProductTypeId"></span></div>
+<div class="field"><label asp-for="Input.Product!.SKU"></label><input asp-for="Input.Product!.SKU" class="form-control" maxlength="100" required /><span asp-validation-for="Input.Product!.SKU"></span></div>
+<div class="field"><label asp-for="Input.Product!.Quantity"></label><input asp-for="Input.Product!.Quantity" class="form-control" type="number" min="1" step="1" required /><span asp-validation-for="Input.Product!.Quantity"></span></div>
+<div class="field"><label asp-for="Input.Product!.EstimatedValue"></label><div class="input-group"><input asp-for="Input.Product!.EstimatedValue" class="form-control decimal-input" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" required /><span class="input-group-text">PLN</span></div><span asp-validation-for="Input.Product!.EstimatedValue"></span></div>
+<div class="field"><label asp-for="Input.Product!.EstimatedMargin"></label><div class="input-group"><input asp-for="Input.Product!.EstimatedMargin" class="form-control decimal-input" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" required /><span class="input-group-text">%</span></div><span asp-validation-for="Input.Product!.EstimatedMargin"></span></div>
+<div class="field"><label asp-for="Input.Product!.FormulaStatus"></label><select asp-for="Input.Product!.FormulaStatus" asp-items="Html.GetEnumSelectList<FormulaStatus>()" class="form-select" required></select><span asp-validation-for="Input.Product!.FormulaStatus"></span></div>
+</div>
+}else{<partial name="~/Views/Projects/_ProductData.cshtml" model="Model.Project.Products.Single(x => x.Id == Model.Input.ProductId)" />}
+<div class="field mt-4"><label asp-for="Input.Comment">@(Model.Input.Decision == ReviewDecision.Rejected ? "Rejection reason (required)" : "Comment (optional)")</label><textarea asp-for="Input.Comment" class="form-control" maxlength="2000" rows="3" required="@(Model.Input.Decision == ReviewDecision.Rejected)"></textarea><span asp-validation-for="Input.Comment"></span></div>
+<div class="form-actions"><a class="btn btn-outline-secondary" asp-action="Review" asp-route-id="@Model.Project.Id">Cancel</a><button class="btn @(Model.Input.Decision == ReviewDecision.Rejected ? "btn-danger" : "btn-primary")" type="submit">@ViewData["Title"]</button></div>
+<p class="wizard-note">If another decision was saved after you opened this form, cancel and reopen review before saving.</p>
+</form>
+@section Scripts {<script src="~/lib/jquery/dist/jquery.min.js"></script><partial name="_ValidationScriptsPartial" /><script src="~/js/project-wizard.js" asp-append-version="true"></script>}

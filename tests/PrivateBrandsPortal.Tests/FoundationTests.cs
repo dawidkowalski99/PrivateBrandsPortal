@@ -41,6 +41,11 @@ public sealed class FoundationTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Test-User", "reader");
         var response = await client.GetAsync(path);
+        if (path == "/Approvals")
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode); // Stage 4 replaces the informational shell with a Manager-only queue.
+            return;
+        }
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains(expected, html);
@@ -65,8 +70,13 @@ public sealed class FoundationTests
     [InlineData("Admin", true, true)]
     public async Task App_role_policies_enforce_permissions(string? role, bool review, bool admin)
     {
-        await using var factory = new AuthenticatedFactory();
-        using var scope = factory.Services.CreateScope();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAuthorization(PortalAuthorization.Configure);
+        services.AddSingleton<PrivateBrandsPortal.Web.Interfaces.IAppUserService>(new PolicyAppUser(role));
+        services.AddScoped<IAuthorizationHandler, ManagerAuthorization>();
+        await using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
         var authorization = scope.ServiceProvider.GetRequiredService<IAuthorizationService>();
         var claims = new List<Claim> { new(ClaimTypes.Name, "TEST\\reader"), new(ClaimTypes.Role, "Admin") };
         if (role is not null) claims.Add(new(PortalAuthorization.RoleClaim, role));
@@ -117,5 +127,17 @@ public sealed class TestAuthenticationHandler(IOptionsMonitor<AuthenticationSche
             return Task.FromResult(AuthenticateResult.NoResult());
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "TEST\\reader")], Scheme.Name);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name)));
+    }
+}
+
+
+internal sealed class PolicyAppUser(string? role) : PrivateBrandsPortal.Web.Interfaces.IAppUserService
+{
+    public Task<PrivateBrandsPortal.Web.Models.Entities.AppUser> GetCurrentAsync(CancellationToken ct = default)
+    {
+        if (role is null) throw new PrivateBrandsPortal.Web.Services.PortalAccessException();
+        return Task.FromResult(new PrivateBrandsPortal.Web.Models.Entities.AppUser {
+            Id = 1, DomainLogin = "TEST\\reader", DisplayName = "Reader",
+            Role = Enum.Parse<PrivateBrandsPortal.Web.Models.Enums.AppRole>(role) });
     }
 }
