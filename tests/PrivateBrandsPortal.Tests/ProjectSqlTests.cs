@@ -17,6 +17,7 @@ namespace PrivateBrandsPortal.Tests;
 
 // Real SQL Server tests. Each test uses a unique disposable profile and removes only its own rows.
 // No SQLite, EnsureCreated, schema changes or modification of seeded dictionaries.
+[Collection("SQL integration")]
 public sealed class ProjectSqlTests
 {
     private sealed class Current(string login) : ICurrentUserService

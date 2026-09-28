@@ -1,0 +1,19 @@
+@model ProjectDetailsViewModel
+@using PrivateBrandsPortal.Web.Models.Enums
+@if (Model.Status is ProjectStatus.Approved or ProjectStatus.Rejected or ProjectStatus.PartiallyApproved)
+{
+    <section class="panel form-panel decision-summary" aria-labelledby="decision-summary-title">
+        <p class="eyebrow">REVIEW COMPLETE</p>
+        <h2 id="decision-summary-title">Decision Summary</h2>
+        <dl class="brief-grid">
+            <div><dt>Project</dt><dd>@Model.ProjectNumber</dd></div>
+            <div><dt>Decision</dt><dd><span class="stage-badge project-status-@Model.Status">@Html.DisplayFor(x => x.Status)</span></dd></div>
+        </dl>
+        <dl class="decision-counts">
+            <div><dt>Products</dt><dd>@Model.Products.Count</dd></div>
+            <div><dt>Approved</dt><dd>@Model.Products.Count(x => x.ReviewStatus == ProductReviewStatus.Approved)</dd></div>
+            <div><dt>Edited &amp; Approved</dt><dd>@Model.Products.Count(x => x.ReviewStatus == ProductReviewStatus.EditedAndApproved)</dd></div>
+            <div><dt>Rejected</dt><dd>@Model.Products.Count(x => x.ReviewStatus == ProductReviewStatus.Rejected)</dd></div>
+        </dl>
+    </section>
+}

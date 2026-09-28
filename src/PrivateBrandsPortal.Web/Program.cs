@@ -19,6 +19,8 @@ builder.Services.Configure<RequestLocalizationOptions>(o =>
 builder.Services.AddScoped<IAppUserService, AppUserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.Configure<DemoAccessOptions>(builder.Configuration.GetSection("DemoAccess"));
+builder.Services.AddScoped<DemoAccess>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ManagerAuthorization>();
 
 builder.Services.AddScoped<ProjectAccessFilter>();

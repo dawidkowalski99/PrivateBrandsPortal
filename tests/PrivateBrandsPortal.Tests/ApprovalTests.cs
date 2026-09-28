@@ -11,9 +11,10 @@ using PrivateBrandsPortal.Web.Services;
 using PrivateBrandsPortal.Web.ViewModels;
 namespace PrivateBrandsPortal.Tests;
 
+[Collection("SQL integration")]
 public sealed class ApprovalTests
 {
-    private static ApprovalService Service(ProjectSqlTests.Scope s, ApplicationDbContext? db = null) => new(db ?? s.Db, s.MakeUsers(db ?? s.Db), TimeProvider.System);
+    private static ApprovalService Service(ProjectSqlTests.Scope s, ApplicationDbContext? db = null) => new(db ?? s.Db, s.MakeUsers(db ?? s.Db), TimeProvider.System, DemoAccessTests.Access(enabled: false));
     private static async Task Manager(ProjectSqlTests.Scope s)
     {
         var user = await s.Users.GetCurrentAsync();
@@ -41,7 +42,7 @@ public sealed class ApprovalTests
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "TEST\\reader"),
             new System.Security.Claims.Claim(PrivateBrandsPortal.Web.Configuration.PortalAuthorization.RoleClaim, "Manager") }, "Test");
         var context = new Microsoft.AspNetCore.Authorization.AuthorizationHandlerContext([requirement], new(identity), null);
-        await new PrivateBrandsPortal.Web.Configuration.ManagerAuthorization(new PolicyAppUser("ProjectManager")).HandleAsync(context);
+        await new PrivateBrandsPortal.Web.Configuration.ManagerAuthorization(new PolicyAppUser("ProjectManager"), DemoAccessTests.Access(enabled: false)).HandleAsync(context);
         Assert.False(context.HasSucceeded);
     }
     [Fact]

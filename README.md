@@ -398,11 +398,11 @@ Po Submit Edit Draft i operacje starego, otwartego wizardu są blokowane na back
 
 Windows/AD odpowiada za authentication. Wszystkie polityki biznesowe odczytują
 aktywnego AppUser; nie ufają przychodzącym claims ról ani grupom AD.
-ManagerReview wymaga dokładnie roli Manager. Istniejące polityki ReviewProjects
+W Production ManagerReview wymaga dokładnie roli Manager. Wyjątek Development opisano poniżej. Istniejące polityki ReviewProjects
 (Manager/Admin) i AdministerPortal (Admin) zachowują zakres ról.
 AppUser jest cache'owany wyłącznie w bieżącym żądaniu; zmiana roli w bazie
 obowiązuje od kolejnego requestu. Sidebar pokazuje DisplayName, a przy jego
-braku DomainLogin. Approvals badge wykonuje jeden Count na żądanie Managera.
+braku DomainLogin. Approvals badge wykonuje jeden Count na żądanie Managera lub uprawnionego użytkownika demo.
 
 Kolejka zawiera AwaitingManagerReview i PartiallyReviewed z Pending,
 posortowane według SubmittedAtUtc, potem Id. Manager widzi wszystkie takie
@@ -452,3 +452,56 @@ Końcowa weryfikacja ETAPU 4: build 0 błędów / 0 ostrzeżeń, 91/91 testów.
 Sprawdzono desktop i mobile 390 px, SSO, odczyt historii i blokady HTTP:
 Projects/Edit po Submit 404, Approvals dla ProjectManagera 403. Logi bez nowych błędów.
 Strona błędu pomija zapytania badge do SQL, także dla zalogowanego użytkownika.
+
+## Demo — jedno konto Windows
+
+Dodatkowe uprawnienie review jest przeznaczone wyłącznie do prezentacji lokalnej.
+W katalogu projektu skonfiguruj User Secrets (przykładowy login zastąp swoim):
+
+```powershell
+.\dotnet.ps1 user-secrets set "DemoAccess:Enabled" "true" --project src/PrivateBrandsPortal.Web
+.\dotnet.ps1 user-secrets set "DemoAccess:UserDomainLogin" "DOMAIN\username" --project src/PrivateBrandsPortal.Web
+```
+
+Uruchom ponownie aplikację w Development. `DemoAccess` wymaga jednocześnie:
+Development, Enabled=true, uwierzytelnionego Windows usera zgodnego z konfiguracją
+oraz aktywnego profilu AppUser o tym samym DomainLogin i roli ProjectManager.
+Porównanie loginu nie rozróżnia wielkości liter. Brak konfiguracji oznacza brak wyjątku.
+Production, Staging i inne środowiska całkowicie ignorują to uprawnienie nawet przy Enabled=true.
+Login i konfiguracja lokalna pozostają w User Secrets, poza repozytorium.
+
+Ta sama kontrola działa w politykach i ApprovalService, także dla badge kolejki.
+Nie nadaje Admina, nie zmienia AppRole ani żadnej roli w SQL. Demo user zachowuje
+ograniczenie Projects do własnych projektów, a w Approvals uzyskuje standardowy
+zakres Managera (wszystkie projekty oczekujące na review). Nie uruchamiaj skryptu
+zmiany roli do tej prezentacji. Zwykły Manager działa bez konfiguracji demo;
+zwykły ProjectManager nadal nie ma dostępu do Approvals.
+
+Wyłączenie demo (następnie restart aplikacji):
+
+```powershell
+.\dotnet.ps1 user-secrets set "DemoAccess:Enabled" "false" --project src/PrivateBrandsPortal.Web
+```
+
+Obecny proces kończy się po review na Approved, Rejected lub PartiallyApproved.
+Nie ma dalszego routingu, InProgress ani Department Tasks. Zakończone projekty
+znikają z aktywnej kolejki bez usuwania historii. Nie była potrzebna migracja.
+
+Project Details i zakończony Manager Review pokazują Decision Summary: numer,
+decyzję, liczbę produktów oraz niezależne liczniki Approved, Edited & Approved,
+Rejected. Approved nie obejmuje produktów EditedAndApproved. Statusy końcowe mają
+zielone, czerwone i bursztynowe badges. Karty zachowują dane, komentarze, autora,
+czas UTC oraz rzeczywiste różnice z audytu.
+
+Weryfikacja demo 28.09.2026, jedno konto Windows bez zmiany roli:
+- PB-2026-0144: Approved, 2 produkty; Approved=1, EditedAndApproved=1, Rejected=0.
+  Body Lotion: Quantity 10000 → 12000, SKU MEETING-BL-001 → MEETING-BL-002;
+  dokładnie dwa wpisy audytu. Projekt zachowany jako dane DEV do prezentacji.
+- PB-2026-0145: PartiallyApproved, 2 produkty; Approved=1, EditedAndApproved=0,
+  Rejected=1, komentarz odrzucenia zachowany. Oba projekty zniknęły z kolejki.
+- SSO, Projects, Approvals, Submit, decyzje, odczyt historii i Decision Summary
+  zweryfikowane w przeglądarce; podsumowanie sprawdzone także przy szerokości 390 px.
+- SQL potwierdza niezmienioną rolę ProjectManager. PB-2026-0005 pozostaje Draftem.
+- Build: 0 błędów / 0 ostrzeżeń; 105/105 testów (91 istniejących i 14 nowych).
+  Testy SQL współdzielą bazę DEV i wykonują się w jednej kolekcji bez równoległego
+  sprzątania danych innych testów. Testy wersji i konfliktów edycji pozostają aktywne.

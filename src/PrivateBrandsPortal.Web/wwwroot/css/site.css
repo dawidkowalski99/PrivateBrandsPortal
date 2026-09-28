@@ -491,3 +491,14 @@ dt {font-weight:400;color:var(--muted);font-size:12px;margin-bottom:6px}dd {font
 .review-badge{display:inline-block;border-radius:18px;padding:6px 12px;font-size:.8rem;font-weight:600;background:#edf1f5;color:#47576d;margin:12px 0}
 .review-Approved,.review-EditedAndApproved{background:#dff3ea;color:#17644b}.review-Rejected{background:#fae6e6;color:#982a36}.review-Pending{background:#fff2d9;color:#795813}
 .review-progress{width:100%;height:12px;accent-color:#218e8c}.review-history{padding:16px 0;border-top:1px solid #edf0f4}.review-comment{white-space:pre-wrap;overflow-wrap:anywhere}.manager-changes{background:#f4f9fa;border-radius:12px;padding:18px;margin-top:16px}.manager-changes h4{font-size:1rem}.manager-change{padding:14px 0;border-bottom:1px solid #dfe9ed}.manager-change:last-child{border:0}.manager-change p{margin:8px 0}.manager-change del{color:#69788c}.manager-change ins{text-decoration:none;color:#12615d;font-weight:700}.review-history small,.manager-change small{color:#596a7f}.card-actions{flex-wrap:wrap}.nav-count{margin-left:auto}.manager-change{overflow-wrap:anywhere}
+
+/* Final review decisions */
+.stage-badge.project-status-Approved { background: #e3f5ed; color: #126143; }
+.stage-badge.project-status-Rejected { background: #fde9e8; color: #9f2925; }
+.stage-badge.project-status-PartiallyApproved { background: #fff2d9; color: #815619; }
+.decision-summary h2 { margin-bottom: 1.5rem; }
+.decision-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0 0; }
+.decision-counts > div { background: #f5f8fc; border-radius: 12px; padding: 1.25rem; }
+.decision-counts dt { color: #53657d; font-size: .85rem; font-weight: 500; }
+.decision-counts dd { color: #172e4f; font-size: 1.8rem; font-weight: 700; margin: .4rem 0 0; }
+@media (max-width: 640px) { .decision-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

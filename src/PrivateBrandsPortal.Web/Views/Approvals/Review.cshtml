@@ -3,7 +3,8 @@
 @{ ViewData["Title"] = "Review " + Model.ProjectNumber; var reviewed = Model.Products.Count(x => x.ReviewStatus != ProductReviewStatus.Pending); }
 @if(TempData["Success"] is string success){<div class="alert alert-success" role="status">@success</div>}
 @if(TempData["Error"] is string error){<div class="alert alert-danger" role="alert">@error</div>}
-<div class="page-heading"><div><p class="eyebrow">MANAGER REVIEW</p><h1>@Model.ProjectNumber</h1><p>@Model.Customer · @Model.Country</p></div><span class="stage-badge">@Html.DisplayFor(x => x.Status)</span></div>
+<div class="page-heading"><div><p class="eyebrow">MANAGER REVIEW</p><h1>@Model.ProjectNumber</h1><p>@Model.Customer · @Model.Country</p></div><span class="stage-badge project-status-@Model.Status">@Html.DisplayFor(x => x.Status)</span></div>
+<partial name="_DecisionSummary" model="Model" />
 <section class="panel form-panel"><dl class="brief-grid"><div><dt>Project Manager</dt><dd>@Model.ProjectManager</dd></div><div><dt>Submitted (UTC)</dt><dd>@Model.SubmittedAtUtc?.ToString("dd.MM.yyyy HH:mm")</dd></div></dl><p>Reviewed @reviewed / @Model.Products.Count</p><progress class="review-progress" value="@reviewed" max="@Math.Max(1,Model.Products.Count)" aria-label="Products reviewed"></progress></section>
 <div class="product-grid">@foreach(var product in Model.Products){<article class="panel product-card">
 <partial name="~/Views/Projects/_ProductData.cshtml" model="product" /><partial name="_ProductReview" model="product" />

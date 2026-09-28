@@ -74,6 +74,7 @@ public sealed class FoundationTests
         services.AddLogging();
         services.AddAuthorization(PortalAuthorization.Configure);
         services.AddSingleton<PrivateBrandsPortal.Web.Interfaces.IAppUserService>(new PolicyAppUser(role));
+        services.AddSingleton(DemoAccessTests.Access(enabled: false));
         services.AddScoped<IAuthorizationHandler, ManagerAuthorization>();
         await using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
