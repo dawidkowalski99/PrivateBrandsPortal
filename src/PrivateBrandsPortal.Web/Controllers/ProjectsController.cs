@@ -59,7 +59,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
         return View("Wizard", new WizardViewModel {
             Token = state.Token, Revision = state.Revision, Step = step, Draft = draft, Brief = draft.Brief,
             Product = product ?? new(), ShowProductForm = showProduct, ProjectManager = user.DisplayName,
-            Countries = await projects.CountriesAsync(ct), ProductTypes = await projects.ProductTypesAsync(ct)
+            Countries = await projects.CountriesAsync(ct), ProductTypes = await projects.ProductCategoriesAsync(ct)
         });
     }
     private IActionResult Next(WizardState state, int step) =>
@@ -101,9 +101,9 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             if (state.SavedProjectId.HasValue) return RedirectToAction(nameof(Details), new { id = state.SavedProjectId });
             if (!state.BriefCompleted) return Next(state, 1);
             if (!Fresh(state, revision)) return await Page(state, 2, ct);
-            input.SKU = (input.SKU ?? "").Trim();
-            if (!(await projects.ProductTypesAsync(ct)).Any(x => x.Id == input.ProductTypeId))
-                ModelState.AddModelError("Product.ProductTypeId", "Select an active product type.");
+            input.SKU = (input.SKU ?? "").Trim(); input.Subcategory = (input.Subcategory ?? "").Trim();
+            if (!(await projects.ProductCategoriesAsync(ct)).Any(x => x.Id == input.ProductCategoryId))
+                ModelState.AddModelError("Product.ProductCategoryId", "Select an active product category.");
             var existing = state.Draft.Products.SingleOrDefault(x => x.Key == input.Key);
             input.PersistedId = existing?.PersistedId; // Never accept database IDs from the browser.
             if (existing is null && state.Draft.Products.Count >= 500) ModelState.AddModelError("", "A draft supports up to 500 products.");

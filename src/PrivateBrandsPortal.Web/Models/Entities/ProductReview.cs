@@ -11,6 +11,8 @@ public sealed class ProductReview
     public AppUser Reviewer { get; set; } = null!;
     public ReviewDecision Decision { get; set; }
     public string? Comment { get; set; }
+    public int? RejectionReasonId { get; set; }
+    public RejectionReason? RejectionReason { get; set; }
+    public string? RejectionReasonName { get; set; }
     public DateTimeOffset ReviewedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
-

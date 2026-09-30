@@ -60,7 +60,7 @@ public sealed class FoundationTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         Assert.Equal("Microsoft.EntityFrameworkCore.SqlServer", db.Database.ProviderName);
-        Assert.Equal(7, db.Model.GetEntityTypes().Count());
+        Assert.Equal(9, db.Model.GetEntityTypes().Count());
     }
 
     [Theory]

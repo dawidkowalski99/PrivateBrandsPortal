@@ -59,11 +59,11 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         var product = project.Products.SingleOrDefault(x => x.Id == productId && x.ReviewStatus == ProductReviewStatus.Pending);
         if (product is null) return null;
         return new ReviewFormModel { Project = project,
-            ProductTypes = await db.ProductTypes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct),
+            RejectionReasons = await db.RejectionReasons.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new ReasonItem(x.Id,x.Name,x.RequiresComment)).ToListAsync(ct), ProductTypes = await db.ProductCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct),
             Input = new ReviewInput { ProjectId = projectId, ProductId = productId, ProjectVersion = project.UpdatedAtUtc,
                 ProductVersion = product.UpdatedAtUtc, Decision = decision,
                 Product = decision == ReviewDecision.EditedAndApproved ? new ProductInput {
-                    ProductTypeId = product.ProductTypeId, SKU = product.SKU, Quantity = product.Quantity,
+                    ProductCategoryId = product.ProductCategoryId, Subcategory = product.ProductType, SKU = product.SKU, Quantity = product.Quantity,
                     EstimatedValue = product.EstimatedValue, EstimatedMargin = product.EstimatedMargin, FormulaStatus = product.FormulaStatus } : null }
         };
     }
@@ -78,12 +78,14 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         var project = await db.Projects.Include(x => x.Products).SingleAsync(x => x.Id == id, ct);
         await db.Entry(project).ReloadAsync(ct); // Also safe when called in the same scope as SaveDraft.
         var input = new DraftInput { Brief = new BriefInput { Customer = project.Customer, CountryId = project.CountryId },
-            Products = project.Products.Select(p => new ProductInput { ProductTypeId = p.ProductTypeId, SKU = p.SKU,
+            Products = project.Products.Select(p => new ProductInput { ProductCategoryId = p.ProductCategoryId, Subcategory = p.Subcategory ?? "", SKU = p.SKU,
                 Quantity = p.Quantity, EstimatedValue = p.EstimatedValue, EstimatedMargin = p.EstimatedMargin, FormulaStatus = p.FormulaStatus }).ToList() };
-        ProjectService.Validate(input);
+        // Historical products may have no category; they are loaded from SQL, never supplied by the request.
+
+        ProjectService.Validate(input, allowLegacyCategories: true);
         if (!await db.Countries.AnyAsync(x => x.Id == project.CountryId && x.IsActive, ct)) throw new ValidationException("Select an active country.");
-        var types = project.Products.Select(x => x.ProductTypeId).Distinct().ToArray();
-        if (await db.ProductTypes.CountAsync(x => types.Contains(x.Id) && x.IsActive, ct) != types.Length) throw new ValidationException("All product types must be active.");
+        var types = project.Products.Where(x => x.ProductCategoryId.HasValue).Select(x => x.ProductCategoryId!.Value).Distinct().ToArray();
+        if (await db.ProductCategories.CountAsync(x => types.Contains(x.Id) && x.IsActive, ct) != types.Length) throw new ValidationException("All product categories must be active.");
         if (project.Products.Any(x => x.ReviewStatus != ProductReviewStatus.Pending) || await db.ProductReviews.AnyAsync(x => x.ProjectProduct.ProjectId == id, ct))
             throw new ValidationException("This project already has review decisions.");
         project.Status = ProjectStatus.AwaitingManagerReview;
@@ -93,6 +95,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
             OldValue = ProjectStatus.Draft.ToString(), NewValue = project.Status.ToString(), ChangedByUserId = user.Id,
             ChangedAtUtc = now, ChangeType = AuditChangeType.ProjectSubmitted });
         await db.SaveChangesAsync(ct);
+
         await tx.CommitAsync(ct);
     }
     private DateTimeOffset Later(DateTimeOffset version) { var now = clock.GetUtcNow(); return now > version ? now : version.AddTicks(1); }
@@ -101,11 +104,18 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         var user = await RequireAsync(AppRole.Manager, ct);
         input.Comment = input.Comment?.Trim();
         Validator.ValidateObject(input, new ValidationContext(input), true);
+        RejectionReason? rejection = null;
+        if (input.Decision == ReviewDecision.Rejected)
+        {
+            rejection = await db.RejectionReasons.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.RejectionReasonId && x.IsActive, ct);
+            if (rejection is null) throw new ValidationException("Select an active rejection reason.");
+            if (rejection.RequiresComment && string.IsNullOrWhiteSpace(input.Comment)) throw new ValidationException("A comment is required for this rejection reason (Other).");
+        }
         if (input.Decision == ReviewDecision.EditedAndApproved)
         {
-            input.Product!.SKU = (input.Product.SKU ?? "").Trim();
+            input.Product!.SKU = (input.Product.SKU ?? "").Trim(); input.Product.Subcategory = (input.Product.Subcategory ?? "").Trim();
             Validator.ValidateObject(input.Product, new ValidationContext(input.Product), true);
-            if (!await db.ProductTypes.AnyAsync(x => x.Id == input.Product.ProductTypeId && x.IsActive, ct)) throw new ValidationException("Select an active product type.");
+            if (!await db.ProductCategories.AnyAsync(x => x.Id == input.Product.ProductCategoryId && x.IsActive, ct)) throw new ValidationException("Select an active product category.");
         }
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = Later(input.ProjectVersion!.Value);
@@ -123,7 +133,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         if (input.Decision == ReviewDecision.EditedAndApproved)
         {
             var p = input.Product!;
-            void Audit(string field, object oldValue, object newValue)
+            void Audit(string field, object? oldValue, object? newValue)
             {
                 var oldText = Convert.ToString(oldValue, CultureInfo.InvariantCulture);
                 var newText = Convert.ToString(newValue, CultureInfo.InvariantCulture);
@@ -131,14 +141,14 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
                 db.AuditLogs.Add(new AuditLog { EntityType = nameof(ProjectProduct), EntityId = product.Id, FieldName = field,
                     OldValue = oldText, NewValue = newText, ChangedByUserId = user.Id, ChangedAtUtc = now, ChangeType = AuditChangeType.ManagerEdit });
             }
-            Audit(nameof(product.ProductTypeId), product.ProductTypeId, p.ProductTypeId!.Value);
+            Audit(nameof(product.ProductCategoryId), product.ProductCategoryId, p.ProductCategoryId); Audit(nameof(product.Subcategory), product.Subcategory, p.Subcategory);
             Audit(nameof(product.SKU), product.SKU, p.SKU);
             Audit(nameof(product.Quantity), product.Quantity, p.Quantity!.Value);
             // Decimal equality ignores scale: unchanged 25 and 25.00 produce no history.
             if (product.EstimatedValue != p.EstimatedValue) Audit(nameof(product.EstimatedValue), product.EstimatedValue, p.EstimatedValue!.Value);
             if (product.EstimatedMargin != p.EstimatedMargin) Audit(nameof(product.EstimatedMargin), product.EstimatedMargin, p.EstimatedMargin!.Value);
             Audit(nameof(product.FormulaStatus), product.FormulaStatus, p.FormulaStatus!.Value);
-            product.ProductTypeId = p.ProductTypeId!.Value; product.SKU = p.SKU; product.Quantity = p.Quantity!.Value;
+            product.ProductCategoryId = p.ProductCategoryId; product.Subcategory = p.Subcategory; product.SKU = p.SKU; product.Quantity = p.Quantity!.Value;
             product.EstimatedValue = p.EstimatedValue!.Value; product.EstimatedMargin = p.EstimatedMargin!.Value; product.FormulaStatus = p.FormulaStatus!.Value;
         }
         product.ReviewStatus = input.Decision switch { ReviewDecision.Approved => ProductReviewStatus.Approved,
@@ -146,10 +156,11 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         product.ReviewComment = input.Comment;
         product.UpdatedAtUtc = now;
         db.ProductReviews.Add(new ProductReview { ProjectProductId = product.Id, ReviewerId = user.Id,
-            Decision = input.Decision!.Value, Comment = input.Comment, ReviewedAtUtc = now });
+            Decision = input.Decision!.Value, Comment = input.Comment, RejectionReasonId = rejection?.Id, RejectionReasonName = rejection?.Name, ReviewedAtUtc = now });
         await db.SaveChangesAsync(ct);
         var statuses = await db.ProjectProducts.AsNoTracking().Where(x => x.ProjectId == input.ProjectId).Select(x => x.ReviewStatus).ToListAsync(ct);
         await db.Projects.Where(x => x.Id == input.ProjectId).ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, CalculateStatus(statuses)), ct);
+        await CommercialService.ArchiveIfCompleteAsync(db, input.ProjectId, now, ct);
         await tx.CommitAsync(ct);
     }
 }

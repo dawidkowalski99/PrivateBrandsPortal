@@ -12,9 +12,11 @@ public sealed class ProductReviewConfiguration : IEntityTypeConfiguration<Produc
         b.ToTable("ProductReviews", t =>
         {
             t.HasCheckConstraint("CK_ProductReviews_Decision", "[Decision] IN ('Approved','Rejected','EditedAndApproved')");
-            t.HasCheckConstraint("CK_ProductReviews_RejectionComment", "[Decision] <> 'Rejected' OR ([Comment] IS NOT NULL AND LEN(LTRIM(RTRIM([Comment]))) > 0)");
+
         });
         b.HasKey(x => x.Id);
+        b.Property(x => x.RejectionReasonName).HasMaxLength(100);
+        b.HasOne(x => x.RejectionReason).WithMany().HasForeignKey(x => x.RejectionReasonId).OnDelete(DeleteBehavior.NoAction);
         b.Property(x => x.Decision).HasConversion<string>().HasMaxLength(32);
         b.Property(x => x.Comment).HasMaxLength(2000);
         b.HasOne(x => x.ProjectProduct).WithMany(x => x.Reviews).HasForeignKey(x => x.ProjectProductId).OnDelete(DeleteBehavior.NoAction);
@@ -22,4 +24,3 @@ public sealed class ProductReviewConfiguration : IEntityTypeConfiguration<Produc
         b.HasIndex(x => new { x.ProjectProductId, x.ReviewedAtUtc });
     }
 }
-

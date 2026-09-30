@@ -16,16 +16,22 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
         if (!user.IsActive || user.Role != AppRole.ProjectManager) throw new PortalAccessException();
         return user;
     }
+    public async Task<int> AwaitingPmAsync(CancellationToken ct = default)
+    {
+        var user=await users.GetCurrentAsync(ct);
+        if(!user.IsActive || user.Role!=AppRole.ProjectManager)return 0;
+        return await db.ProjectProducts.AsNoTracking().CountAsync(x=>x.Project.ProjectManagerId==user.Id && x.CommercialStatus==null && (x.ReviewStatus==ProductReviewStatus.Approved || x.ReviewStatus==ProductReviewStatus.EditedAndApproved),ct);
+    }
     public async Task<IReadOnlyList<LookupItem>> CountriesAsync(CancellationToken ct = default) =>
         await db.Countries.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
             .Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct);
-    public async Task<IReadOnlyList<LookupItem>> ProductTypesAsync(CancellationToken ct = default) =>
-        await db.ProductTypes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
+    public async Task<IReadOnlyList<LookupItem>> ProductCategoriesAsync(CancellationToken ct = default) =>
+        await db.ProductCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
             .Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct);
     public async Task<IReadOnlyList<ProjectListItemViewModel>> ListAsync(CancellationToken ct = default)
     {
         var user = await OwnerAsync(ct);
-        return await db.Projects.AsNoTracking().Where(x => x.ProjectManagerId == user.Id)
+        return await db.Projects.AsNoTracking().Where(x => x.ProjectManagerId == user.Id && x.ArchivedAtUtc == null)
             .OrderByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.Id)
             .Select(x => new ProjectListItemViewModel {
                 Id = x.Id, ProjectNumber = x.ProjectNumber, Customer = x.Customer, Country = x.Country.Name,
@@ -49,12 +55,12 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
             ProjectId = project.Id, OriginalUpdatedAtUtc = project.UpdatedAtUtc,
             Brief = new BriefInput { Customer = project.Customer, CountryId = project.CountryId },
             Products = project.Products.OrderBy(x => x.Id).Select(x => new ProductInput {
-                PersistedId = x.Id, ProductTypeId = x.ProductTypeId, SKU = x.SKU, Quantity = x.Quantity,
+                PersistedId = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, Subcategory = x.Subcategory ?? "", SKU = x.SKU, Quantity = x.Quantity,
                 EstimatedValue = x.EstimatedValue, EstimatedMargin = x.EstimatedMargin, FormulaStatus = x.FormulaStatus
             }).ToList()
         };
     }
-    public static void Validate(DraftInput input)
+    public static void Validate(DraftInput input, bool allowLegacyCategories = false)
     {
         input.Brief.Customer = (input.Brief.Customer ?? "").Trim();
         Validator.ValidateObject(input.Brief, new ValidationContext(input.Brief), true);
@@ -62,8 +68,11 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
         if (input.Products.Count > 500) throw new ValidationException("A draft supports up to 500 products.");
         foreach (var product in input.Products)
         {
-            product.SKU = (product.SKU ?? "").Trim();
-            Validator.ValidateObject(product, new ValidationContext(product), true);
+            product.SKU = (product.SKU ?? "").Trim(); product.Subcategory = (product.Subcategory ?? "").Trim();
+            var errors = new List<ValidationResult>();
+            Validator.TryValidateObject(product, new ValidationContext(product), errors, true);
+            var error = errors.FirstOrDefault(e => !(allowLegacyCategories && product.ProductCategoryId is null && e.MemberNames.SequenceEqual(new[] { nameof(ProductInput.ProductCategoryId) })));
+            if (error is not null) throw new ValidationException(error.ErrorMessage);
         }
         if (input.Products.Select(p => p.Key).Distinct().Count() != input.Products.Count)
             throw new ValidationException("Duplicate product keys.");
@@ -74,9 +83,9 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
         Validate(input);
         if (!await db.Countries.AnyAsync(x => x.Id == input.Brief.CountryId && x.IsActive, ct))
             throw new ValidationException("Select an active country.");
-        var types = input.Products.Select(p => p.ProductTypeId!.Value).Distinct().ToArray();
-        if (await db.ProductTypes.CountAsync(x => types.Contains(x.Id) && x.IsActive, ct) != types.Length)
-            throw new ValidationException("One or more product types are no longer active.");
+        var types = input.Products.Select(p => p.ProductCategoryId!.Value).Distinct().ToArray();
+        if (await db.ProductCategories.CountAsync(x => types.Contains(x.Id) && x.IsActive, ct) != types.Length)
+            throw new ValidationException("One or more product categories are no longer active.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = clock.GetUtcNow();
@@ -116,7 +125,7 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
                 ? project.Products.Single(x => x.Id == productId)
                 : new ProjectProduct { SKU = item.SKU, CreatedAtUtc = now, ReviewStatus = ProductReviewStatus.Pending };
             if (item.PersistedId is null) project.Products.Add(product);
-            product.ProductTypeId = item.ProductTypeId!.Value;
+            product.ProductCategoryId = item.ProductCategoryId; product.Subcategory = item.Subcategory; // Preserve legacy ProductTypeId on existing products.
             product.SKU = item.SKU;
             product.Quantity = item.Quantity!.Value;
             product.EstimatedValue = item.EstimatedValue!.Value;

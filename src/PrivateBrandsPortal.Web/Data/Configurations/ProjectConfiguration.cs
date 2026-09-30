@@ -12,6 +12,7 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.ToTable("Projects", t => t.HasCheckConstraint("CK_Projects_Status",
             "[Status] IN ('Draft','AwaitingManagerReview','PartiallyReviewed','Approved','Rejected','InProgress','Completed','Cancelled','PartiallyApproved')"));
         b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.ArchivedAtUtc, x.CreatedAtUtc });
         b.Property(x => x.ProjectNumber).IsRequired().HasMaxLength(32).IsUnicode(false);
         b.HasIndex(x => x.ProjectNumber).IsUnique();
         b.Property(x => x.Customer).IsRequired().HasMaxLength(200);

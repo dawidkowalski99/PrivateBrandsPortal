@@ -96,7 +96,7 @@ public sealed class DemoAccessTests
             var current = (await reviews.ReviewAsync(id))!;
             var decision = index == 0 ? first : second;
             var input = (await reviews.FormAsync(id, current.Products[index].Id, decision))!.Input;
-            input.Comment = decision == ReviewDecision.Rejected ? "Demo rejection" : null;
+            input.RejectionReasonId = decision == ReviewDecision.Rejected ? 7 : null; input.Comment = decision == ReviewDecision.Rejected ? "Demo rejection" : null;
             if (input.Product is not null) input.Product.Quantity += 100;
             await reviews.DecideAsync(input);
         }
@@ -107,7 +107,7 @@ public sealed class DemoAccessTests
         Assert.Null(await reviews.FormAsync(id, final.Products[0].Id, ReviewDecision.Approved));
         Assert.Equal(AppRole.ProjectManager, (await s.Users.GetCurrentAsync()).Role);
         Assert.Contains(await s.Projects.ListAsync(), x => x.Id == id);
-        Assert.Equal(7, s.Db.Model.GetEntityTypes().Count()); // No downstream task model.
+        Assert.Equal(9, s.Db.Model.GetEntityTypes().Count()); // No downstream task model.
         if (second == ReviewDecision.EditedAndApproved) Assert.Single(final.Products[1].Changes);
         // Backend uses the same gate as policies, even if a caller skips HTTP authorization.
         var disabled = new ApprovalService(s.Db, s.Users, TimeProvider.System, Access("Production", configured: s.Login, login: s.Login));

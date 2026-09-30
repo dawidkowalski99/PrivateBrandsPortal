@@ -3,7 +3,7 @@
 <span class="review-badge review-@Model.ReviewStatus">@Html.DisplayFor(x => x.ReviewStatus)</span>
 @foreach(var review in Model.Reviews){
 <div class="review-history"><p><strong>@Html.DisplayFor(_ => review.Decision)</strong></p>
-@if(!string.IsNullOrWhiteSpace(review.Comment)){<p class="review-comment"><strong>@(review.Decision == ReviewDecision.Rejected ? "Reason" : "Comment"):</strong> @review.Comment</p>}
+@if(review.RejectionReason is not null){<p><strong>Rejection Reason:</strong> @review.RejectionReason</p>}@if(!string.IsNullOrWhiteSpace(review.Comment)){<p class="review-comment"><strong>@(review.Decision == ReviewDecision.Rejected ? "Reason" : "Comment"):</strong> @review.Comment</p>}
 <small>Reviewed by: @review.Reviewer<br />Reviewed at: @review.ReviewedAtUtc.ToString("dd.MM.yyyy HH:mm") UTC</small></div>
 }
 @if(Model.Changes.Count > 0){<section class="manager-changes"><h4>Manager Changes</h4><span class="subtle-badge">CHANGED BY MANAGER</span>

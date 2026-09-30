@@ -31,7 +31,8 @@
 <input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" /><input type="hidden" asp-for="Product.Key" />
 <div class="section-intro"><h2>@(Model.Draft.Products.Any(x=>x.Key==Model.Product.Key) ? "Edit product" : "Add a product")</h2><p>All fields are required. Use a comma or dot for decimal values.</p></div>
 <div class="form-grid">
-<div class="field"><label asp-for="Product.ProductTypeId"></label><select asp-for="Product.ProductTypeId" class="form-select" required><option value="">Select product type</option>@foreach(var type in Model.ProductTypes){<option value="@type.Id">@type.Name</option>}</select><span asp-validation-for="Product.ProductTypeId"></span></div>
+<div class="field"><label asp-for="Product.ProductCategoryId"></label><select asp-for="Product.ProductCategoryId" class="form-select" required><option value="">Select product category</option>@foreach(var type in Model.ProductTypes){<option value="@type.Id">@type.Name</option>}</select><span asp-validation-for="Product.ProductCategoryId"></span></div>
+<div class="field"><label asp-for="Product.Subcategory"></label><input asp-for="Product.Subcategory" class="form-control" maxlength="100" required /><span asp-validation-for="Product.Subcategory"></span></div>
 <div class="field"><label asp-for="Product.SKU"></label><input asp-for="Product.SKU" class="form-control" maxlength="100" required /><span asp-validation-for="Product.SKU"></span></div>
 <div class="field"><label asp-for="Product.Quantity"></label><input asp-for="Product.Quantity" class="form-control" type="number" min="1" max="2147483647" step="1" required /><span asp-validation-for="Product.Quantity"></span></div>
 <div class="field"><label asp-for="Product.EstimatedValue"></label><div class="input-group"><input asp-for="Product.EstimatedValue" class="form-control decimal-input" type="text" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" /><span class="input-group-text">PLN</span></div><span asp-validation-for="Product.EstimatedValue"></span></div>
@@ -53,7 +54,7 @@
 </div>
 @if(Model.Draft.Products.Count == 0)
 {
-<section class="panel empty-state"><span class="empty-icon">▦</span><h3>Add your first product</h3><p>Choose a product type and add its quantities and estimates.<br />At least one product is required to continue.</p></section>
+<section class="panel empty-state"><span class="empty-icon">▦</span><h3>Add your first product</h3><p>Choose a product category and add its quantities and estimates.<br />At least one product is required to continue.</p></section>
 }
 <div class="form-actions"><a class="btn btn-outline-secondary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="1">Back</a>
 @if(Model.Draft.Products.Count > 0){<a class="btn btn-primary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="3">Continue to Summary →</a>}
@@ -78,5 +79,3 @@ else {<button class="btn btn-primary" disabled>Continue to Summary →</button>}
 <partial name="_ValidationScriptsPartial" />
 <script src="~/js/project-wizard.js" asp-append-version="true"></script>
 }
-
-

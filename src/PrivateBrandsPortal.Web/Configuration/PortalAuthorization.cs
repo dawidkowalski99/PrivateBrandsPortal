@@ -13,6 +13,7 @@ public static class PortalAuthorization
     {
         options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
         options.AddPolicy(ReviewProjects, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Manager, AppRole.Admin)));
+        options.AddPolicy("Reports", p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.ProjectManager, AppRole.Manager, AppRole.Admin)));
         options.AddPolicy(ManagerReview, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Manager)));
         options.AddPolicy(AdministerPortal, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Admin)));
     }

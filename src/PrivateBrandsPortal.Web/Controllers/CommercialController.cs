@@ -1,0 +1,24 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
+using PrivateBrandsPortal.Web.Configuration;
+using PrivateBrandsPortal.Web.Services;
+using PrivateBrandsPortal.Web.ViewModels;
+namespace PrivateBrandsPortal.Web.Controllers;
+[ServiceFilter(typeof(ProjectAccessFilter)), ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
+public sealed class CommercialController(CommercialService service) : Controller
+{
+    [HttpGet] public async Task<IActionResult> Change(int projectId,int productId,CancellationToken ct)
+    { var model=await service.FormAsync(projectId,productId,ct); return model is null ? NotFound() : View(model); }
+    [HttpPost] public async Task<IActionResult> Change([Bind(Prefix="Input")] CommercialInput input,CancellationToken ct)
+    {
+        if(ModelState.IsValid) try { await service.UpdateAsync(input,ct); TempData["Success"]="Commercial status updated."; return RedirectToAction("Details","Projects",new{id=input.ProjectId}); }
+        catch(ValidationException ex){ ModelState.AddModelError("",ex.Message); }
+        var model=await service.FormAsync(input.ProjectId,input.ProductId,ct); if(model is null) return NotFound();
+        model.Input=input; return View(model);
+    }
+}
+[ServiceFilter(typeof(ProjectAccessFilter)), ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
+public sealed class ArchiveController(CommercialService service) : Controller
+{
+    public async Task<IActionResult> Index(CancellationToken ct)=>View(await service.ArchiveAsync(ct));
+}

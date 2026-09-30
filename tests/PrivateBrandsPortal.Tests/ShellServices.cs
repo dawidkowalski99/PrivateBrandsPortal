@@ -10,11 +10,12 @@ internal sealed class ShellAppUser(Microsoft.AspNetCore.Http.IHttpContextAccesso
 }
 internal sealed class ShellProjects : IProjectService
 {
+    public Task<int> AwaitingPmAsync(CancellationToken ct = default) => Task.FromResult(0);
     public Task<IReadOnlyList<ProjectListItemViewModel>> ListAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<ProjectListItemViewModel>>([]);
     public Task<ProjectDetailsViewModel?> DetailsAsync(int id, CancellationToken ct = default) => Task.FromResult<ProjectDetailsViewModel?>(null);
     public Task<DraftInput?> LoadDraftAsync(int id, CancellationToken ct = default) => Task.FromResult<DraftInput?>(null);
     public Task<int> SaveDraftAsync(DraftInput input, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<LookupItem>> CountriesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
-    public Task<IReadOnlyList<LookupItem>> ProductTypesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
+    public Task<IReadOnlyList<LookupItem>> ProductCategoriesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
 }

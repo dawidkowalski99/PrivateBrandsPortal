@@ -32,7 +32,7 @@ public sealed class ApprovalTests
     private static async Task<ReviewInput> Input(ProjectSqlTests.Scope manager, int id, ReviewDecision decision, int index = 0)
     {
         var p = (await Service(manager).ReviewAsync(id))!;
-        return (await Service(manager).FormAsync(id, p.Products[index].Id, decision))!.Input;
+        var input = (await Service(manager).FormAsync(id, p.Products[index].Id, decision))!.Input; if(decision == ReviewDecision.Rejected) input.RejectionReasonId = 10; return input;
     }
     [Fact]
     public async Task Incoming_manager_claim_does_not_override_app_user_role()
@@ -183,7 +183,7 @@ public sealed class ApprovalTests
         await using var owner = new ProjectSqlTests.Scope(); await using var manager = new ProjectSqlTests.Scope();
         var id = await Submitted(owner); await Manager(manager);
         var input = await Input(manager, id, ReviewDecision.EditedAndApproved);
-        input.Product!.ProductTypeId = 4; input.Product.SKU = "changed"; input.Product.Quantity = 7;
+        input.Product!.ProductCategoryId = 3; input.Product.SKU = "changed"; input.Product.Quantity = 7;
         input.Product.EstimatedValue = 12.34m; input.Product.EstimatedMargin = 10; input.Product.FormulaStatus = FormulaStatus.NewFormula;
         await Service(manager).DecideAsync(input);
         Assert.Equal(6, (await owner.Projects.DetailsAsync(id))!.Products[0].Changes.Count);

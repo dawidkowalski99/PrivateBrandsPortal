@@ -483,7 +483,7 @@ Wyłączenie demo (następnie restart aplikacji):
 .\dotnet.ps1 user-secrets set "DemoAccess:Enabled" "false" --project src/PrivateBrandsPortal.Web
 ```
 
-Obecny proces kończy się po review na Approved, Rejected lub PartiallyApproved.
+W demonstracji z 28.09.2026 proces kończył się po review na Approved, Rejected lub PartiallyApproved.
 Nie ma dalszego routingu, InProgress ani Department Tasks. Zakończone projekty
 znikają z aktywnej kolejki bez usuwania historii. Nie była potrzebna migracja.
 
@@ -505,3 +505,103 @@ Weryfikacja demo 28.09.2026, jedno konto Windows bez zmiany roli:
 - Build: 0 błędów / 0 ostrzeżeń; 105/105 testów (91 istniejących i 14 nowych).
   Testy SQL współdzielą bazę DEV i wykonują się w jednej kolekcji bez równoległego
   sprzątania danych innych testów. Testy wersji i konfliktów edycji pozostają aktywne.
+
+## Reporting i Commercial Workflow
+
+Po manager review decyzja projektu pozostaje Approved, Rejected lub PartiallyApproved.
+Dalszy proces jest zapisywany osobno jako `ProjectProduct.CommercialStatus`:
+PriceOfferSubmitted → OfferUnderNegotiation → CustomerApprovedOrder →
+ImplementationIntoProduction → SalesAndDelivery. Dostępny jest także
+CustomerNotApproved. PM może wybrać status odpowiedni do bieżącej sytuacji;
+system nie wymusza przejścia przez wszystkie pośrednie statusy.
+
+Tylko aktywny ProjectManager będący właścicielem może zmieniać status SKU
+Approved lub EditedAndApproved. Null wyświetla się jako **Awaiting PM update**;
+nie jest dodatkową opcją dropdown. Pending i Rejected nie mają procesu komercyjnego.
+SalesAndDelivery kończy SKU i blokuje dalsze zmiany. Każda rzeczywista zmiana
+zapisuje stary/nowy status, autora i UTC w AuditLogs. Ponowne wybranie tego samego
+statusu nie tworzy wpisu. Aktualizacja, audyt i archiwizacja są jedną transakcją.
+Porównanie wersji projektu blokuje zapis starego formularza oraz równoległe zmiany.
+
+Projekt trafia do **Archive**, jeżeli ma przynajmniej jeden zaakceptowany SKU,
+wszystkie zaakceptowane SKU mają SalesAndDelivery, a pozostałe są Rejected.
+Pending blokuje archiwizację. Same Rejected oraz CustomerNotApproved nie kończą
+projektu. `ArchivedAtUtc` jest ustawiane tylko raz. Projekt znika z aktywnej listy
+Projects, ale zachowuje szczegóły, decyzje i historię; archiwum obejmuje własne
+projekty PM. Raporty mogą obejmować zarówno aktywne, jak i archiwalne projekty.
+
+### Słowniki i istniejące dane
+
+Nowe produkty wymagają aktywnej **ProductCategory** i tekstowej **Subcategory**
+(trim, maksymalnie 100 znaków). Kategorie początkowe: Hair Care, Body Care,
+Face Cream. Tabela ProductTypes i powiązania historyczne pozostają zachowane.
+Migracja kopiuje nazwę istniejącego ProductType do Subcategory, bez zgadywania
+kategorii. Historyczny brak kategorii jest oznaczony jako legacy. Stary Draft
+można wysłać do review; przy edycji produktu należy wskazać kategorię.
+
+Nowe odrzucenie wymaga aktywnego **RejectionReason**. Seed zawiera:
+Price barrier; Lack of technology; Inability to meet quality requirements;
+Not meeting the NPD; Not meeting the MOQ; Project with low potential;
+Price too high; Formulation quality below expectations; Lack of information; Other.
+Other wymaga komentarza także po zmianie nazwy słownikowej (`RequiresComment`).
+Dla pozostałych powodów komentarz jest opcjonalny, chyba że Admin włączy obowiązek.
+Raz włączony obowiązek pozostaje aktywny. Nazwa powodu jest utrwalana przy decyzji;
+zmiana nazwy słownika nie zmienia historii. Historyczne odrzucenia bez słownika
+zachowują swój komentarz.
+
+Administration udostępnia Adminowi dodawanie, edycję, sortowanie i dezaktywację
+Product Categories oraz Rejection Reasons. Nie ma fizycznego usuwania wpisów.
+Dezaktywacja nie usuwa powiązań historycznych. Users, Countries i legacy Product
+Types zachowują dotychczasowe strony bazowe. DemoAccess nie nadaje uprawnień Admina.
+
+### Raporty i CSV
+
+Reports jest dostępne aktywnym ProjectManagerom, Managerom i Adminom i obejmuje
+portfel wszystkich PM. To szerszy zakres od własnej listy Projects i Archive.
+KPI: Projects, SKUs, Approved SKUs, Edited & Approved SKUs, Rejected SKUs oraz
+Sales & Delivery SKUs. Approved nie zawiera EditedAndApproved. Projects liczy
+unikalne ProjectId reprezentowane przez SKU spełniające filtry; SKUs liczy wiersze
+produktów. Te same definicje obowiązują w agregacji per PM.
+
+Filtry: PM, Created Date From/To (UTC, obie granice dni włącznie), Country,
+Project Status, Manager Decision, Commercial Status, Product Category,
+Subcategory, Customer oraz Archived (All/Active/Archived). Historyczne nieaktywne
+słowniki są dostępne do filtrowania. Filtrowanie i agregacje wykonuje SQL Server;
+szczegóły są stronicowane po 50 SKU. Tekstowe fallbacki legacy mają jawną kolację
+w zapytaniu, aby nie zmieniać kolacji istniejących tabel i danych.
+
+Export CSV używa dokładnie tych samych filtrów, eksportując wszystkie pasujące
+SKU, nie tylko bieżącą stronę. Eksport jest strumieniowany, UTF-8 z BOM, separator
+średnik, polski przecinek dziesiętny, cytowanie pól oraz zabezpieczenie przed
+interpretowaniem tekstów użytkownika jako formuł arkusza. XLSX nie jest wdrożony.
+
+### Migracja i weryfikacja
+
+Nowa migracja: `20260930102447_ReportingAndCommercialWorkflow`.
+Poprzednie migracje nie zostały zmienione. Po skonfigurowaniu connection stringa
+w User Secrets, przed uruchomieniem nowej wersji:
+
+```powershell
+.\dotnet.ps1 ef database update --project src/PrivateBrandsPortal.Web
+.\dotnet.ps1 build
+.\dotnet.ps1 test
+```
+
+Nie stosuj EnsureCreated ani ręcznego tworzenia tabel. Seed migracji nie dubluje
+danych przy ponownym database update. Cofnięcie migracji jest blokowane, jeśli
+spowodowałoby utratę nowych danych biznesowych. Przed migracją produkcyjną wykonaj
+backup zgodnie z procedurą firmy i zatrzymaj wcześniejszą wersję aplikacji.
+
+Testy obejmują transakcje SQL, ownership, konflikty wersji, historię, archiwizację,
+słowniki, legacy, autoryzację HTTP, CSRF, filtry, agregacje, paginację i CSV.
+Wymagają skonfigurowanej bazy DEV; tworzą i sprzątają własne izolowane rekordy.
+Numery sekwencji zużyte przez testy nie są cofane.
+
+Test ręczny 30.09.2026: **PB-2026-0361**, Analytics Demo, Germany, 2 SKU.
+Shampoo Approved przeszedł pięć zmian aż do SalesAndDelivery; Body Lotion Rejected
+z powodem Price too high i komentarzem. Projekt jest w Archive, ma pięć wpisów
+historii komercyjnej i pozostaje jako dane DEV. Połączone filtry raportu zwracają
+1 projekt / 1 SKU / 100000,00 PLN, zgodnie z pobranym CSV. Sprawdzono desktop i
+mobile 390 px: szczegóły, historię PM, archiwum, filtry, KPI i tabele raportowe.
+Formularze Admina są objęte testami HTTP i SQL; ręczny test wymaga konta Admin.
+Końcowy build: 0 błędów / 0 ostrzeżeń. Testy: 145/145, bez pominiętych. Model EF zgodny z migracją. Porównanie SQL potwierdziło zachowanie 9 SKU wcześniejszych projektów demo (0005, 0052, 0144, 0145).

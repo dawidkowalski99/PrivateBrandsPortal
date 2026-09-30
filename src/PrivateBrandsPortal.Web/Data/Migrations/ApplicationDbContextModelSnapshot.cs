@@ -202,6 +202,73 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PrivateBrandsPortal.Web.Models.Entities.ProductCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_CI_AS");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ProductCategories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 10,
+                            IsActive = true,
+                            Name = "Hair Care",
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 20,
+                            IsActive = true,
+                            Name = "Body Care",
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 30,
+                            IsActive = true,
+                            Name = "Face Cream",
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
+                });
+
             modelBuilder.Entity("PrivateBrandsPortal.Web.Models.Entities.ProductReview", b =>
                 {
                     b.Property<int>("Id")
@@ -222,6 +289,13 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                     b.Property<int>("ProjectProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("RejectionReasonId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RejectionReasonName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTimeOffset>("ReviewedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -230,6 +304,8 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("RejectionReasonId");
+
                     b.HasIndex("ReviewerId");
 
                     b.HasIndex("ProjectProductId", "ReviewedAtUtc");
@@ -237,8 +313,6 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                     b.ToTable("ProductReviews", null, t =>
                         {
                             t.HasCheckConstraint("CK_ProductReviews_Decision", "[Decision] IN ('Approved','Rejected','EditedAndApproved')");
-
-                            t.HasCheckConstraint("CK_ProductReviews_RejectionComment", "[Decision] <> 'Rejected' OR ([Comment] IS NOT NULL AND LEN(LTRIM(RTRIM([Comment]))) > 0)");
                         });
                 });
 
@@ -326,6 +400,9 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTimeOffset?>("ArchivedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<int>("CountryId")
                         .HasColumnType("int");
 
@@ -366,6 +443,8 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                     b.HasIndex("ProjectNumber")
                         .IsUnique();
 
+                    b.HasIndex("ArchivedAtUtc", "CreatedAtUtc");
+
                     b.HasIndex("ProjectManagerId", "Status");
 
                     b.HasIndex("Status", "UpdatedAtUtc");
@@ -384,6 +463,10 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CommercialStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -400,7 +483,10 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<int>("ProductTypeId")
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProductTypeId")
                         .HasColumnType("int");
 
                     b.Property<int>("ProjectId")
@@ -425,28 +511,179 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Subcategory")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductCategoryId");
+
                     b.HasIndex("ProductTypeId");
 
                     b.HasIndex("ProjectId");
 
+                    b.HasIndex("ReviewStatus", "CommercialStatus");
+
                     b.ToTable("ProjectProducts", null, t =>
                         {
+                            t.HasCheckConstraint("CK_ProjectProducts_Commercial", "[CommercialStatus] IS NULL OR ([ReviewStatus] IN ('Approved','EditedAndApproved') AND [CommercialStatus] IN ('PriceOfferSubmitted','OfferUnderNegotiation','CustomerApprovedOrder','CustomerNotApproved','ImplementationIntoProduction','SalesAndDelivery'))");
+
                             t.HasCheckConstraint("CK_ProjectProducts_Formula", "[FormulaStatus] IN ('ReadyToGo','NewFormula')");
 
                             t.HasCheckConstraint("CK_ProjectProducts_Margin", "[EstimatedMargin] >= 0 AND [EstimatedMargin] <= 100");
 
                             t.HasCheckConstraint("CK_ProjectProducts_Quantity", "[Quantity] > 0");
 
-                            t.HasCheckConstraint("CK_ProjectProducts_RejectionComment", "[ReviewStatus] <> 'Rejected' OR ([ReviewComment] IS NOT NULL AND LEN(LTRIM(RTRIM([ReviewComment]))) > 0)");
-
                             t.HasCheckConstraint("CK_ProjectProducts_Review", "[ReviewStatus] IN ('Pending','Approved','Rejected','EditedAndApproved')");
 
                             t.HasCheckConstraint("CK_ProjectProducts_Value", "[EstimatedValue] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("PrivateBrandsPortal.Web.Models.Entities.RejectionReason", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_CI_AS");
+
+                    b.Property<bool>("RequiresComment")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("RejectionReasons");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 10,
+                            IsActive = true,
+                            Name = "Price barrier",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 20,
+                            IsActive = true,
+                            Name = "Lack of technology",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 30,
+                            IsActive = true,
+                            Name = "Inability to meet quality requirements",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 40,
+                            IsActive = true,
+                            Name = "Not meeting the NPD",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 50,
+                            IsActive = true,
+                            Name = "Not meeting the MOQ",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 60,
+                            IsActive = true,
+                            Name = "Project with low potential",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 70,
+                            IsActive = true,
+                            Name = "Price too high",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 8,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 80,
+                            IsActive = true,
+                            Name = "Formulation quality below expectations",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 9,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 90,
+                            IsActive = true,
+                            Name = "Lack of information",
+                            RequiresComment = false,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 10,
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayOrder = 100,
+                            IsActive = true,
+                            Name = "Other",
+                            RequiresComment = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
 
@@ -469,6 +706,11 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("PrivateBrandsPortal.Web.Models.Entities.RejectionReason", "RejectionReason")
+                        .WithMany()
+                        .HasForeignKey("RejectionReasonId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("PrivateBrandsPortal.Web.Models.Entities.AppUser", "Reviewer")
                         .WithMany("ProductReviews")
                         .HasForeignKey("ReviewerId")
@@ -476,6 +718,8 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("ProjectProduct");
+
+                    b.Navigation("RejectionReason");
 
                     b.Navigation("Reviewer");
                 });
@@ -501,17 +745,23 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
 
             modelBuilder.Entity("PrivateBrandsPortal.Web.Models.Entities.ProjectProduct", b =>
                 {
+                    b.HasOne("PrivateBrandsPortal.Web.Models.Entities.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("PrivateBrandsPortal.Web.Models.Entities.ProductType", "ProductType")
                         .WithMany("Products")
                         .HasForeignKey("ProductTypeId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("PrivateBrandsPortal.Web.Models.Entities.Project", "Project")
                         .WithMany("Products")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.Navigation("ProductCategory");
 
                     b.Navigation("ProductType");
 

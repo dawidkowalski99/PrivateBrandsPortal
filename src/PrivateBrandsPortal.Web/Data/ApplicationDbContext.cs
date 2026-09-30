@@ -7,6 +7,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<RejectionReason> RejectionReasons => Set<RejectionReason>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<ProjectProduct> ProjectProducts => Set<ProjectProduct>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();

@@ -1,0 +1,7 @@
+@model CommercialForm
+@using PrivateBrandsPortal.Web.Models.Enums
+@{ViewData["Title"]="Change PM Status";}
+<div class="page-heading"><div><p class="eyebrow">@Model.ProjectNumber · @Model.SKU</p><h1>Change PM Status</h1><p>Each saved change is recorded in the product history. Sales and delivery completes this SKU.</p></div></div>
+<form method="post" class="panel form-panel"><div asp-validation-summary="All" class="validation-summary"></div><input asp-for="Input.ProjectId" type="hidden"/><input asp-for="Input.ProductId" type="hidden"/><input name="Input.Version" value="@Model.Input.Version?.ToString("O")" type="hidden"/>
+<div class="field"><label asp-for="Input.Status"></label><select asp-for="Input.Status" asp-items="Html.GetEnumSelectList<CommercialStatus>()" class="form-select" required><option value="">Select status</option></select><span asp-validation-for="Input.Status"></span></div>
+<div class="form-actions"><a asp-controller="Projects" asp-action="Details" asp-route-id="@Model.Input.ProjectId" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary">Save status</button></div></form>

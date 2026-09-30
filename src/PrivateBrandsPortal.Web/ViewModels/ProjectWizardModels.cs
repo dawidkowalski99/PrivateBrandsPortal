@@ -13,8 +13,12 @@ public sealed class ProductInput : IValidatableObject
 {
     public Guid Key { get; set; } = Guid.NewGuid();
     public int? PersistedId { get; set; }
-    [Required, Range(1, int.MaxValue), Display(Name = "Product Type")]
+    [Range(1, int.MaxValue), Display(Name = "Legacy Product Type")]
     public int? ProductTypeId { get; set; }
+    [Required, Range(1, int.MaxValue), Display(Name = "Product Category")]
+    public int? ProductCategoryId { get; set; }
+    [Required, StringLength(100), Display(Name = "Subcategory")]
+    public string Subcategory { get; set; } = "";
     [Required, StringLength(100)]
     public string SKU { get; set; } = "";
     [Required, Range(1, int.MaxValue)]
@@ -44,9 +48,9 @@ public sealed record LookupItem(int Id, string Name);
 public sealed class WizardViewModel
 {
     public ProductCardViewModel Card(ProductInput product) => new(
-        ProductTypes.FirstOrDefault(x => x.Id == product.ProductTypeId)?.Name ?? "Unavailable product type",
+        product.Subcategory,
         product.SKU, product.Quantity!.Value, product.EstimatedValue!.Value,
-        product.EstimatedMargin!.Value, product.FormulaStatus!.Value);
+        product.EstimatedMargin!.Value, product.FormulaStatus!.Value) { Category = ProductTypes.FirstOrDefault(x => x.Id == product.ProductCategoryId)?.Name };
     public Guid Token { get; set; }
     public int Revision { get; set; }
     public int Step { get; set; } = 1;
@@ -73,6 +77,7 @@ public sealed class ProjectListItemViewModel
 public sealed class ProjectDetailsViewModel
 {
     public DateTimeOffset? SubmittedAtUtc { get; set; }
+    public DateTimeOffset? ArchivedAtUtc { get; set; }
     public int Id { get; set; }
     public string ProjectNumber { get; set; } = "";
     public string Customer { get; set; } = "";
@@ -87,7 +92,11 @@ public sealed record ProductCardViewModel(string ProductType, string SKU, int Qu
     decimal EstimatedValue, decimal EstimatedMargin, FormulaStatus FormulaStatus)
 {
     public int Id { get; init; }
-    public int ProductTypeId { get; init; }
+    public int? ProductTypeId { get; init; }
+    public int? ProductCategoryId { get; init; }
+    public string? Category { get; init; }
+    public CommercialStatus? CommercialStatus { get; init; }
+    public List<ManagerChange> CommercialHistory { get; init; } = [];
     public DateTimeOffset UpdatedAtUtc { get; init; }
     public ProductReviewStatus ReviewStatus { get; init; }
     public List<ReviewHistoryItem> Reviews { get; init; } = [];

@@ -9,3 +9,4 @@
 <section class="panel"><div class="panel-heading"><div><h2>Recent Projects</h2><p>Your latest briefs and product updates.</p></div><a class="text-link" asp-controller="Projects" asp-action="Index">View projects →</a></div>
 <div class="empty-state"><span class="empty-icon" aria-hidden="true">▤</span><h3>Your next project starts here</h3><p>Briefs, products and their progress will appear in this workspace.<br />Project creation will be added in the next stages.</p><span class="subtle-badge">No project data connected yet</span></div></section>
 <div class="info-strip"><span class="info-symbol" aria-hidden="true">i</span><div><strong>A foundation for the whole project journey</strong><p>The workspace is ready. Brief creation, product review and change history will be introduced step by step.</p></div></div>
+@await Component.InvokeAsync("AwaitingPm")

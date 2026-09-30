@@ -11,8 +11,8 @@ public sealed class WizardTests
     internal static DraftInput ValidDraft() => new() {
         Brief = new() { Customer = "  Test customer  ", CountryId = 2 },
         Products = [
-            new() { ProductTypeId = 1, SKU = "  SKU-1  ", Quantity = 20000, EstimatedValue = 150000m, EstimatedMargin = 31.5m, FormulaStatus = FormulaStatus.ReadyToGo },
-            new() { ProductTypeId = 3, SKU = "SKU-2", Quantity = 10000, EstimatedValue = 95000m, EstimatedMargin = 28m, FormulaStatus = FormulaStatus.NewFormula }
+            new() { ProductCategoryId = 1, Subcategory = "Shampoo", SKU = "  SKU-1  ", Quantity = 20000, EstimatedValue = 150000m, EstimatedMargin = 31.5m, FormulaStatus = FormulaStatus.ReadyToGo },
+            new() { ProductCategoryId = 2, Subcategory = "Body Lotion", SKU = "SKU-2", Quantity = 10000, EstimatedValue = 95000m, EstimatedMargin = 28m, FormulaStatus = FormulaStatus.NewFormula }
         ]
     };
     [Fact]

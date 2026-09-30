@@ -15,6 +15,6 @@ public sealed class Project
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? SubmittedAtUtc { get; set; }
+    public DateTimeOffset? ArchivedAtUtc { get; set; }
     public ICollection<ProjectProduct> Products { get; set; } = new List<ProjectProduct>();
 }
-
