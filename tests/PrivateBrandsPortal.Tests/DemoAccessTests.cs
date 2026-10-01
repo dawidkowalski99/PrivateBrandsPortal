@@ -54,7 +54,7 @@ public sealed class DemoAccessTests
         var context = new AuthorizationHandlerContext([requirement], principal, null);
         await new ManagerAuthorization(new PolicyAppUser("ProjectManager"), demo).HandleAsync(context);
         Assert.Equal(expected, context.HasSucceeded);
-        var admin = new AppRoleRequirement(AppRole.Admin);
+        var admin = new AppRoleRequirement(AppRole.SuperAdmin);
         var adminContext = new AuthorizationHandlerContext([admin], principal, null);
         await new ManagerAuthorization(new PolicyAppUser("ProjectManager"), demo).HandleAsync(adminContext);
         Assert.False(adminContext.HasSucceeded);
@@ -107,7 +107,7 @@ public sealed class DemoAccessTests
         Assert.Null(await reviews.FormAsync(id, final.Products[0].Id, ReviewDecision.Approved));
         Assert.Equal(AppRole.ProjectManager, (await s.Users.GetCurrentAsync()).Role);
         Assert.Contains(await s.Projects.ListAsync(), x => x.Id == id);
-        Assert.Equal(9, s.Db.Model.GetEntityTypes().Count()); // No downstream task model.
+        Assert.Equal(11, s.Db.Model.GetEntityTypes().Count()); // No downstream task model.
         if (second == ReviewDecision.EditedAndApproved) Assert.Single(final.Products[1].Changes);
         // Backend uses the same gate as policies, even if a caller skips HTTP authorization.
         var disabled = new ApprovalService(s.Db, s.Users, TimeProvider.System, Access("Production", configured: s.Login, login: s.Login));

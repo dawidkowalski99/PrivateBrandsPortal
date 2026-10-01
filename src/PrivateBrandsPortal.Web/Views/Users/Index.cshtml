@@ -1,0 +1,7 @@
+@model UserListPage
+@{ViewData["Title"]="Users";}
+<div class="page-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>Users</h1><p>Windows accounts, business roles and additional permissions.</p></div></div>
+<form method="get" class="panel form-panel"><label for="search">Find a user</label><div class="input-group"><input id="search" name="search" value="@Model.Search" class="form-control" maxlength="200" placeholder="Name or domain login"/><button class="btn btn-primary">Search</button></div></form>
+<section class="panel mt-4"><div class="table-responsive"><table class="table project-table"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Permissions</th><th>Created (UTC)</th><th>Updated (UTC)</th><th></th></tr></thead><tbody>
+@foreach(var row in Model.Users){<tr><td><strong>@row.DisplayName</strong><br/><small>@row.DomainLogin</small></td><td>@EnumLabel.Text(row.Role)</td><td>@(row.IsActive?"Active":"Inactive")</td><td>@(row.Role==PrivateBrandsPortal.Web.Models.Enums.AppRole.SuperAdmin?"All administrative permissions":string.Join(", ",row.Permissions))</td><td>@row.CreatedAtUtc.ToString("dd.MM.yyyy HH:mm")</td><td>@row.UpdatedAtUtc.ToString("dd.MM.yyyy HH:mm")</td><td><a asp-action="Edit" asp-route-id="@row.Id">Edit</a></td></tr>}
+</tbody></table></div></section>

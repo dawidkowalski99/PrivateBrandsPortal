@@ -605,3 +605,78 @@ historii komercyjnej i pozostaje jako dane DEV. Połączone filtry raportu zwrac
 mobile 390 px: szczegóły, historię PM, archiwum, filtry, KPI i tabele raportowe.
 Formularze Admina są objęte testami HTTP i SQL; ręczny test wymaga konta Admin.
 Końcowy build: 0 błędów / 0 ostrzeżeń. Testy: 145/145, bez pominiętych. Model EF zgodny z migracją. Porównanie SQL potwierdziło zachowanie 9 SKU wcześniejszych projektów demo (0005, 0052, 0144, 0145).
+
+## SuperAdmin, permissions i administracja użytkowników
+
+Migracja `20261001083808_UserPermissions` dodaje Permissions (unikalny Code),
+AppUserPermissions (klucz złożony AppUserId + PermissionId) oraz rozszerza edycję
+Countries o UpdatedAtUtc do wykrywania konfliktów. Poprzednie migracje pozostają
+bez zmian. Historyczna rola Admin jest przekształcana w SuperAdmin; użytkownicy,
+projekty i ich właściciele nie są usuwani. Nie dodano CanManageDictionaries.
+Cofnięcie tej migracji wymaga jawnej procedury przeniesienia uprawnień, ponieważ
+starsza wersja aplikacji inaczej autoryzuje dostęp.
+
+Role biznesowe nadal oznaczają ProjectManager (własne projekty i commercial)
+oraz Manager (review). SuperAdmin daje automatycznie pełne uprawnienia
+administracyjne, ale nie zastępuje ról biznesowych i nie omija Windows SSO ani
+IsActive. Nieaktywny profil nie ma dostępu do aplikacji. DemoAccess zachowuje
+wyłącznie dotychczasowy wyjątek review w Development, bez obejścia permissions.
+
+Cztery początkowe uprawnienia:
+- MANAGE_USERS — Manage users;
+- MANAGE_DICTIONARIES — Manage dictionaries (Countries, Product Categories, Rejection Reasons);
+- VIEW_REPORTS — View reports;
+- EXPORT_REPORTS — Export reports.
+
+Zwykły użytkownik nie otrzymuje tych uprawnień automatycznie z roli.
+Raporty nadal obejmują portfel wszystkich PM, ale teraz wymagają VIEW_REPORTS.
+EXPORT_REPORTS jest niezależne: chroni endpoint CSV i widoczność przycisku.
+IPermissionService, policies i handler korzystają z profilu wraz z aktywnymi
+przypisaniami odczytanego raz na request. Nieaktywne Permission nie daje dostępu.
+SuperAdmin nie wymaga osobnych wpisów w tabeli łączącej.
+
+Administration → Users oferuje wyszukiwanie po nazwie lub DomainLogin, listę
+z rolą, aktywnością, uprawnieniami i timestampami UTC oraz Edit User.
+MANAGE_USERS pozwala edytować zwykłe konta i nadawać im dodatkowe uprawnienia.
+Wyłącznie SuperAdmin może nadać/odebrać rolę SuperAdmin lub edytować taki profil,
+w tym jego aktywność i permissions. Delegowany administrator nie może nadać sobie
+SuperAdmin. Zmiany roli, aktywności i przypisań zapisują AuditLogs.
+
+Zapis użytkownika jest transakcyjny i wymaga zgodnej wersji UpdatedAtUtc.
+Transakcyjna blokada SQL `PrivateBrandsPortal.UserAdministration` serializuje
+zmiany dostępu; wewnątrz blokady ponownie sprawdzane są aktualne prawa autora,
+wersja celu i istnienie innego aktywnego SuperAdmina. Backend odrzuca odebranie
+roli lub dezaktywację ostatniego aktywnego SuperAdmina, także przy równoczesnych
+żądaniach. Formularz nie jest jedynym zabezpieczeniem.
+
+### Pierwszy SuperAdmin w DEV
+
+W lokalnej kopii `scripts/set-dev-user-role.sql` wskaż zatwierdzony DomainLogin
+istniejącego aktywnego AppUser i ustaw @Role = N'SuperAdmin'. Helper działa tylko
+w PrivateBrandsPortal_DEV i odmawia bootstrapu, gdy aktywny SuperAdmin już istnieje.
+Nie wpisuj loginu do repozytorium. Helper używa tej samej blokady co serwis Users.
+Po bootstrapie zarządzaj dostępem przez Administration → Users. Nie używaj
+helpera do obchodzenia ochrony ostatniego SuperAdmina.
+
+Dnia 01.10.2026, po osobnym potwierdzeniu użytkownika, jego bieżący profil DEV
+został ustawiony jako SuperAdmin. Pozostał aktywny; nie nadano zbędnych wierszy
+permissions. W przeglądarce potwierdzono działanie Users i słowników oraz odrzucenie
+prób dezaktywacji i odebrania roli ostatniemu aktywnemu SuperAdminowi.
+
+### Copy From / Duplicate Product
+
+W kroku Products przycisk Duplicate otwiera edytowalną kopię karty z nowym kluczem.
+Copy From pozwala wyszukać produkt we własnych projektach (numer, klient, SKU;
+maksymalnie 100 wyników). Backend zawsze sprawdza właściciela źródła oraz token
+i wersję docelowego wizardu. POST jest chroniony antiforgery. Można kopiować także
+z własnych projektów zakończonych; produkt docelowy zawsze powstaje w Drafcie.
+
+Kopiowane są wyłącznie dane wejściowe: kategoria, subkategoria, SKU, ilość, wartość,
+marża i formula. Nie przechodzą ID bazy, decyzje, commercial status ani historia.
+Nieaktywna lub nieprzypisana kategoria wymaga ponownego wyboru. Użytkownik najpierw
+przegląda/edytuje kopię, potem wybiera Save product; dopiero Save Draft utrwala
+ją w bazie jako nowy produkt Pending. Źródło nie jest modyfikowane.
+Test przeglądarkowy potwierdził Copy From i niezależną edycję Duplicate w wizardzie,
+bez zapisywania dodatkowego projektu DEV.
+
+Końcowa weryfikacja 01.10.2026: build 0 błędów / 0 ostrzeżeń, 164/164 testy bez pominiętych. Zachowano wszystkie 145 wcześniejszych testów z aktualizacją oczekiwań zmienionego modelu i autoryzacji. SQL potwierdził zachowane projekty demo i cztery seedowane permissions.

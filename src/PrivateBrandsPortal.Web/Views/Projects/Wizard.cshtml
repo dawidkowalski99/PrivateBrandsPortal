@@ -25,6 +25,12 @@
 @if (Model.Step == 2)
 {
 <div class="section-heading"><div><h2>Products <span class="subtle-badge">@Model.Draft.Products.Count</span></h2><p>Add the products included in this brief.</p></div><a class="btn btn-primary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2" asp-route-add="true">+ Add Product</a></div>
+<a class="btn btn-outline-secondary mb-3" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2" asp-route-copy="true">Copy From</a>
+@if(ViewData["CopySources"] is IReadOnlyList<PrivateBrandsPortal.Web.Services.CopySource> sources){
+<section class="panel form-panel mb-4"><h2>Copy from your projects</h2><p>Choose a source, review its values and save the new product. Decisions and history are never copied. Showing up to 100 results; narrow your search if needed.</p>
+<form method="get" asp-action="Wizard"><input type="hidden" name="token" value="@Model.Token"/><input type="hidden" name="step" value="2"/><input type="hidden" name="copy" value="true"/><label for="copy-search">Project number, customer or SKU</label><div class="input-group"><input id="copy-search" name="search" value="@ViewData["CopySearch"]" class="form-control" maxlength="100"/><button class="btn btn-outline-secondary">Search</button></div></form>
+@foreach(var source in sources){<form asp-action="Copy" method="post" class="d-flex justify-content-between gap-3 mt-3"><input type="hidden" asp-for="Token"/><input type="hidden" asp-for="Revision"/><input type="hidden" name="sourceId" value="@source.Id"/><span><strong>@source.ProjectNumber · @source.SKU</strong><br/>@source.Customer · @source.Subcategory</span><button class="btn btn-outline-primary">Copy</button></form>}
+</section>}
 @if (Model.ShowProductForm)
 {
 <form asp-action="Product" method="post" class="panel form-panel product-editor" id="product-editor">
@@ -48,6 +54,7 @@
 <article class="panel product-card">
 <partial name="_ProductData" model="Model.Card(product)" />
 <div class="card-actions"><a class="btn btn-outline-secondary btn-sm" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2" asp-route-edit="@product.Key">Edit</a>
+<form asp-action="Copy" method="post"><input type="hidden" asp-for="Token"/><input type="hidden" asp-for="Revision"/><input type="hidden" name="key" value="@product.Key"/><button class="btn btn-outline-secondary btn-sm">Duplicate</button></form>
 <form asp-action="Remove" method="post" data-confirm="Remove product?"><input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" /><input type="hidden" name="key" value="@product.Key" /><button type="submit" class="btn btn-outline-danger btn-sm">Remove</button></form></div>
 </article>
 }

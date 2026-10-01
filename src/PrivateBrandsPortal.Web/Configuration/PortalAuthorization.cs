@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using PrivateBrandsPortal.Web.Models.Enums;
+using PrivateBrandsPortal.Web.Services;
 namespace PrivateBrandsPortal.Web.Configuration;
 
 public static class PortalAuthorization
@@ -11,10 +12,12 @@ public static class PortalAuthorization
     public const string RoleClaim = "privatebrands:role";
     public static void Configure(AuthorizationOptions options)
     {
-        options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
-        options.AddPolicy(ReviewProjects, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Manager, AppRole.Admin)));
-        options.AddPolicy("Reports", p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.ProjectManager, AppRole.Manager, AppRole.Admin)));
+        options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(Enum.GetValues<AppRole>())).Build();
+        options.AddPolicy(ReviewProjects, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Manager)));
+        options.AddPolicy("Reports", p => p.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(PermissionCodes.ViewReports)));
+        foreach (var code in new[] { PermissionCodes.ManageUsers, PermissionCodes.ManageDictionaries, PermissionCodes.ViewReports, PermissionCodes.ExportReports })
+            options.AddPolicy(code, p => p.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(code)));
         options.AddPolicy(ManagerReview, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Manager)));
-        options.AddPolicy(AdministerPortal, p => p.RequireAuthenticatedUser().AddRequirements(new AppRoleRequirement(AppRole.Admin)));
+        options.AddPolicy(AdministerPortal, p => p.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(PermissionCodes.ManageDictionaries)));
     }
 }

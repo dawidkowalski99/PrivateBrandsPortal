@@ -1,6 +1,6 @@
 @model DictionaryPage
-@{ViewData["Title"]=Model.Kind==DictionaryKind.ProductCategories?"Product Categories":"Rejection Reasons";}
+@{ViewData["Title"]=Model.Kind switch { DictionaryKind.ProductCategories=>"Product Categories",DictionaryKind.Countries=>"Countries",_=>"Rejection Reasons" };}
 <div class="page-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>@ViewData["Title"]</h1><p>Deactivate entries to keep historical references available.</p></div><a class="btn btn-primary" asp-action="Edit" asp-route-kind="@Model.Kind">+ Add</a></div>
 <section class="panel"><div class="table-responsive"><table class="table project-table"><thead><tr><th>Name</th><th>Description</th><th>Order</th><th>Active</th><th></th></tr></thead><tbody>
-@foreach(var row in Model.Items){<tr><td>@row.Name</td><td>@row.Description</td><td>@row.DisplayOrder</td><td>@(row.IsActive?"Active":"Inactive")</td><td><a asp-action="Edit" asp-route-kind="@Model.Kind" asp-route-id="@row.Id">Edit</a></td></tr>}
+@foreach(var row in Model.Items){<tr><td>@row.Name @if(row.Code is not null){<small>@row.Code</small>}</td><td>@row.Description</td><td>@row.DisplayOrder</td><td>@(row.IsActive?"Active":"Inactive")</td><td><a asp-action="Edit" asp-route-kind="@Model.Kind" asp-route-id="@row.Id">Edit</a></td></tr>}
 </tbody></table></div></section>

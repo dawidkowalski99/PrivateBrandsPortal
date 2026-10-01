@@ -4,6 +4,8 @@ namespace PrivateBrandsPortal.Web.Data;
 
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<AppUserPermission> AppUserPermissions => Set<AppUserPermission>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();

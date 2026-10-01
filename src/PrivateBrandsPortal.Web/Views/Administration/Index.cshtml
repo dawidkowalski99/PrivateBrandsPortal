@@ -1,12 +1,13 @@
+@inject PrivateBrandsPortal.Web.Interfaces.IPermissionService Permissions
+@using PrivateBrandsPortal.Web.Services
 @{ ViewData["Title"] = "Administration"; }
-<div class="page-heading"><div><p class="eyebrow">A WORKSPACE THAT GROWS WITH YOU</p><h1>Administration</h1><p>Maintain the people and reference data behind your projects.</p></div><span class="stage-badge">Reference data</span></div>
-<div class="admin-grid">
-@foreach (var area in new[] { ("Users", "Application access, roles and departments.", "◎"), ("Product Types", "Legacy product types retained for existing projects.", "▦"), ("Countries", "Markets available for customer briefs.", "⊕") })
-{
-<section class="panel admin-card"><span class="empty-icon" aria-hidden="true">@area.Item3</span><h2>@area.Item1</h2><p>@area.Item2</p><span class="subtle-badge">Not enabled yet</span></section>
+<div class="page-heading"><div><p class="eyebrow">ACCESS &amp; REFERENCE DATA</p><h1>Administration</h1><p>Maintain access and the reference data behind your projects.</p></div></div>
+@if(await Permissions.HasAsync(PermissionCodes.ManageUsers)){
+<div class="admin-grid"><a class="panel admin-card" asp-controller="Users" asp-action="Index"><h2>Users</h2><p>Roles, permissions and account availability.</p></a></div>
 }
-</div>
-@inject Microsoft.AspNetCore.Authorization.IAuthorizationService Authorization
-@if((await Authorization.AuthorizeAsync(User,null,PrivateBrandsPortal.Web.Configuration.PortalAuthorization.AdministerPortal)).Succeeded){
-<div class="admin-grid mt-4"><a class="panel admin-card" asp-controller="Dictionaries" asp-action="Index" asp-route-kind="ProductCategories"><h2>Product Categories</h2><p>Maintain categories and availability.</p></a><a class="panel admin-card" asp-controller="Dictionaries" asp-action="Index" asp-route-kind="RejectionReasons"><h2>Rejection Reasons</h2><p>Maintain review reasons and availability.</p></a></div>
-}else{<section class="panel form-panel mt-4"><h2>Product Categories &amp; Rejection Reasons</h2><p>Dictionary management requires an active Admin role.</p></section>}
+@if(await Permissions.HasAsync(PermissionCodes.ManageDictionaries)){
+<h2 class="mt-4">Dictionaries</h2><div class="admin-grid">
+@foreach(var item in new[]{("Countries","Countries"),("ProductCategories","Product Categories"),("RejectionReasons","Rejection Reasons")}){
+<a class="panel admin-card" asp-controller="Dictionaries" asp-action="Index" asp-route-kind="@item.Item1"><h2>@item.Item2</h2><p>Add, edit or deactivate entries.</p></a>
+}</div>
+}else{<section class="panel form-panel mt-4"><h2>Dictionaries</h2><p>Ask a user administrator for Manage dictionaries access.</p></section>}

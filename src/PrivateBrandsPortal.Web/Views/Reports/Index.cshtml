@@ -1,7 +1,8 @@
 @model ReportPage
+@inject PrivateBrandsPortal.Web.Interfaces.IPermissionService Permissions
 @using PrivateBrandsPortal.Web.Models.Enums
 @{ViewData["Title"]="Reports";}
-<div class="page-heading"><div><p class="eyebrow">PORTFOLIO ANALYTICS</p><h1>Reports</h1><p>Project and SKU performance across Project Managers. Dates use project creation time in UTC.</p></div><a asp-action="Export" asp-all-route-data="Model.Filter.Routes(1)" class="btn btn-primary">Export CSV</a></div>
+<div class="page-heading"><div><p class="eyebrow">PORTFOLIO ANALYTICS</p><h1>Reports</h1><p>Project and SKU performance across Project Managers. Dates use project creation time in UTC.</p></div>@if(await Permissions.HasAsync(PrivateBrandsPortal.Web.Services.PermissionCodes.ExportReports)){<a asp-action="Export" asp-all-route-data="Model.Filter.Routes(1)" class="btn btn-primary">Export CSV</a>}</div>
 <form method="get" class="panel form-panel report-filters"><div asp-validation-summary="All" class="validation-summary"></div><div class="form-grid">
 <div class="field"><label asp-for="Filter.ProjectManagerId"></label><select asp-for="Filter.ProjectManagerId" class="form-select"><option value="">All Project Managers</option>@foreach(var x in Model.Users){<option value="@x.Id">@x.Name</option>}</select></div>
 <div class="field"><label asp-for="Filter.DateFrom"></label><input asp-for="Filter.DateFrom" type="date" class="form-control"/></div>

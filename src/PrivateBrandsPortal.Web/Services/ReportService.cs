@@ -6,9 +6,9 @@ using PrivateBrandsPortal.Web.Models.Entities;
 using PrivateBrandsPortal.Web.Models.Enums;
 using PrivateBrandsPortal.Web.ViewModels;
 namespace PrivateBrandsPortal.Web.Services;
-public sealed class ReportService(ApplicationDbContext db,IAppUserService users)
+public sealed class ReportService(ApplicationDbContext db,IPermissionService permissions)
 {
-    private async Task Authorize(CancellationToken ct){var u=await users.GetCurrentAsync(ct);if(!u.IsActive || u.Role is not (AppRole.ProjectManager or AppRole.Manager or AppRole.Admin))throw new PortalAccessException();}
+    private Task Authorize(CancellationToken ct) => permissions.RequireAsync(PermissionCodes.ViewReports, ct);
     private IQueryable<ProjectProduct> Filter(ReportFilter f)
     {
         Validator.ValidateObject(f,new ValidationContext(f),true);
@@ -43,5 +43,5 @@ public sealed class ReportService(ApplicationDbContext db,IAppUserService users)
             Countries=await db.Countries.AsNoTracking().OrderBy(x=>x.DisplayOrder).ThenBy(x=>x.Name).Select(x=>new LookupItem(x.Id,x.Name)).ToListAsync(ct),
             Categories=await db.ProductCategories.AsNoTracking().OrderBy(x=>x.DisplayOrder).ThenBy(x=>x.Name).Select(x=>new LookupItem(x.Id,x.Name)).ToListAsync(ct)};
     }
-    public async Task<IAsyncEnumerable<ReportRow>> ExportAsync(ReportFilter filter,CancellationToken ct=default){await Authorize(ct);return Rows(Filter(filter)).AsAsyncEnumerable();}
+    public async Task<IAsyncEnumerable<ReportRow>> ExportAsync(ReportFilter filter,CancellationToken ct=default){await permissions.RequireAsync(PermissionCodes.ExportReports,ct);return Rows(Filter(filter)).AsAsyncEnumerable();}
 }

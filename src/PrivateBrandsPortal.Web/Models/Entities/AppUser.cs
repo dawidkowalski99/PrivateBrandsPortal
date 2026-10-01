@@ -13,8 +13,8 @@ public sealed class AppUser
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public ICollection<AppUserPermission> Permissions { get; set; } = new List<AppUserPermission>();
     public ICollection<Project> Projects { get; set; } = new List<Project>();
     public ICollection<ProductReview> ProductReviews { get; set; } = new List<ProductReview>();
     public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 }
-

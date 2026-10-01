@@ -8,7 +8,7 @@ namespace PrivateBrandsPortal.Web.Controllers;
 
 [ServiceFilter(typeof(ProjectAccessFilter))]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals) : Controller
+public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals, ProductCopyService copies) : Controller
 {
     public async Task<IActionResult> Index(CancellationToken ct) => View(await projects.ListAsync(ct));
     public async Task<IActionResult> Details(int id, CancellationToken ct)
@@ -71,7 +71,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
         ModelState.AddModelError("", "This wizard changed in another tab. Review the latest values and try again.");
         return false;
     }
-    public Task<IActionResult> Wizard(Guid token, int step = 1, Guid? edit = null, bool add = false, CancellationToken ct = default) =>
+    public Task<IActionResult> Wizard(Guid token, int step = 1, Guid? edit = null, bool add = false, bool copy = false, string? search = null, CancellationToken ct = default) =>
         With(token, ct, async state => {
             if (state.SavedProjectId is int saved) return RedirectToAction(nameof(Details), new { id = saved });
             step = Math.Clamp(step, 1, 3);
@@ -81,6 +81,11 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             }
             var product = edit.HasValue ? state.Draft.Products.SingleOrDefault(x => x.Key == edit.Value) : null;
             if (edit.HasValue && product is null) return NotFound();
+            if(copy && step==2) {
+                if(search?.Length>100)return BadRequest();
+                ViewData["CopySources"]=await copies.SourcesAsync(search,ct);
+                ViewData["CopySearch"]=search;
+            }
             return await Page(state, step, ct, product is null ? null : WizardStore.Snapshot(new DraftInput { Products = [product] }).Products[0], add || edit.HasValue);
         });
     [HttpPost]
@@ -122,6 +127,21 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             if (product is null) return NotFound();
             state.Draft.Products.Remove(product); state.Revision++;
             return Next(state, 2);
+        });
+    [HttpPost]
+    public Task<IActionResult> Copy(Guid token, int revision, Guid? key, int? sourceId, CancellationToken ct) =>
+        With(token, ct, async state => {
+            if(state.SavedProjectId.HasValue)return RedirectToAction(nameof(Details),new{id=state.SavedProjectId});
+            if(!state.BriefCompleted)return Next(state,1);
+            if(!Fresh(state,revision))return await Page(state,2,ct);
+            if(state.Draft.Products.Count>=500){ModelState.AddModelError("","A draft supports up to 500 products.");return await Page(state,2,ct);}
+            ProductInput? copy=null;
+            if(key.HasValue && !sourceId.HasValue){var source=state.Draft.Products.SingleOrDefault(x=>x.Key==key);if(source is not null)copy=ProductCopyService.Duplicate(source);}
+            else if(sourceId.HasValue && !key.HasValue)copy=await copies.CopyAsync(sourceId.Value,ct);
+            if(copy is null)return NotFound();
+            if(!(await projects.ProductCategoriesAsync(ct)).Any(x=>x.Id==copy.ProductCategoryId))copy.ProductCategoryId=null;
+            ModelState.Clear();
+            return await Page(state,2,ct,copy,true);
         });
     [HttpPost]
     public Task<IActionResult> Save(Guid token, int revision, CancellationToken ct) =>

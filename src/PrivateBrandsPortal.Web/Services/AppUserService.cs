@@ -16,7 +16,7 @@ public sealed class AppUserService(ApplicationDbContext db, ICurrentUserService 
         var login = current.DomainLogin;
         if (!current.IsAuthenticated || string.IsNullOrWhiteSpace(login) || login.Length > 256)
             throw new PortalAccessException();
-        var user = await db.AppUsers.AsNoTracking().SingleOrDefaultAsync(x => x.DomainLogin == login, cancellationToken);
+        var user = await db.AppUsers.AsNoTracking().Include(x => x.Permissions).ThenInclude(x => x.Permission).SingleOrDefaultAsync(x => x.DomainLogin == login, cancellationToken);
         if (user is null)
         {
             if (!environment.IsDevelopment()) throw new PortalAccessException();
@@ -32,7 +32,7 @@ public sealed class AppUserService(ApplicationDbContext db, ICurrentUserService 
             catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
             {
                 db.Entry(user).State = EntityState.Detached;
-                user = await db.AppUsers.AsNoTracking().SingleAsync(x => x.DomainLogin == login, cancellationToken);
+                user = await db.AppUsers.AsNoTracking().Include(x => x.Permissions).ThenInclude(x => x.Permission).SingleAsync(x => x.DomainLogin == login, cancellationToken);
             }
         }
         if (!user.IsActive) throw new PortalAccessException();

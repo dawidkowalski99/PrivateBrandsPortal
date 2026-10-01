@@ -10,12 +10,30 @@ namespace PrivateBrandsPortal.Tests;
 [Collection("SQL integration")]
 public sealed class DictionaryTests
 {
+    [Fact]
+    public async Task Countries_support_edit_deactivation_and_version_conflicts_without_changing_seed()
+    {
+        await using var s=new ProjectSqlTests.Scope();
+        var service=new DictionaryService(s.Db,new PermissionService(new PolicyAppUser("SuperAdmin")),TimeProvider.System);
+        var used=await s.Db.Countries.Select(x=>x.Code).ToListAsync();
+        var code=(from a in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" from b in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" select $"{a}{b}").First(x=>!used.Contains(x));
+        var input=new DictionaryInput{Kind=DictionaryKind.Countries,Name=s.Login,Code=code};
+        try {
+            await service.SaveAsync(input,default);
+            var saved=(await service.ListAsync(DictionaryKind.Countries,default)).Items.Single(x=>x.Name==s.Login);
+            var stale=await service.GetAsync(DictionaryKind.Countries,saved.Id,default);
+            saved.IsActive=false;await service.SaveAsync(saved,default);
+            Assert.False((await service.GetAsync(DictionaryKind.Countries,saved.Id,default))!.IsActive);
+            await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(()=>service.SaveAsync(stale!,default));
+        }
+        finally { await s.Db.Countries.Where(x=>x.Name==s.Login).ExecuteDeleteAsync(); }
+    }
     [Theory]
     [InlineData(DictionaryKind.ProductCategories)]
     [InlineData(DictionaryKind.RejectionReasons)]
     public async Task Admin_can_create_edit_deactivate_and_conflicting_edits_are_rejected(DictionaryKind kind)
     {
-        await using var s=new ProjectSqlTests.Scope();var service=new DictionaryService(s.Db,new PolicyAppUser("Admin"),TimeProvider.System);
+        await using var s=new ProjectSqlTests.Scope();var service=new DictionaryService(s.Db,new PermissionService(new PolicyAppUser("SuperAdmin")),TimeProvider.System);
         var input=new DictionaryInput{Kind=kind,Name=s.Login+" entry",DisplayOrder=11,RequiresComment=kind==DictionaryKind.RejectionReasons};
         await service.SaveAsync(input,default);var saved=(await service.ListAsync(kind,default)).Items.Single(x=>x.Name==input.Name);
         var stale=await service.GetAsync(kind,saved.Id,default);saved.IsActive=false;saved.DisplayOrder=22;saved.Description="Test description";saved.RequiresComment=false;
@@ -24,7 +42,7 @@ public sealed class DictionaryTests
         if(kind==DictionaryKind.RejectionReasons)Assert.True(updated.RequiresComment);
         await Assert.ThrowsAsync<ValidationException>(()=>service.SaveAsync(stale!,default));
         await Assert.ThrowsAsync<ValidationException>(()=>service.SaveAsync(input,default));
-        var denied=new DictionaryService(s.Db,s.Users,TimeProvider.System);await Assert.ThrowsAsync<PortalAccessException>(()=>denied.SaveAsync(updated,default));
+        var denied=new DictionaryService(s.Db,new PermissionService(s.Users),TimeProvider.System);await Assert.ThrowsAsync<PortalAccessException>(()=>denied.SaveAsync(updated,default));
     }
     [Theory]
     [InlineData("/Dictionaries?kind=ProductCategories","Product Categories")]
@@ -35,7 +53,7 @@ public sealed class DictionaryTests
     {
         await using var baseline=new AuthenticatedFactory();using var denied=baseline.CreateClient();denied.DefaultRequestHeaders.Add("X-Test-User","reader");
         Assert.Equal(HttpStatusCode.Forbidden,(await denied.GetAsync(path)).StatusCode);
-        await using var admin=baseline.WithWebHostBuilder(b=>b.ConfigureServices(s=>s.AddScoped<IAppUserService>(_=>new PolicyAppUser("Admin"))));
+        await using var admin=baseline.WithWebHostBuilder(b=>b.ConfigureServices(s=>s.AddScoped<IAppUserService>(_=>new PolicyAppUser("SuperAdmin"))));
         using var client=admin.CreateClient();client.DefaultRequestHeaders.Add("X-Test-User","reader");var response=await client.GetAsync(path);Assert.Equal(HttpStatusCode.OK,response.StatusCode);Assert.Contains(expected,await response.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsync("/Dictionaries/Edit",new FormUrlEncodedContent([]))).StatusCode);
     }

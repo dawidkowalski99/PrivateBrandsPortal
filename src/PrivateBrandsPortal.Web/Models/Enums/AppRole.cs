@@ -8,7 +8,6 @@ public enum AppRole
     ProjectManager = 1,
     [Display(Name = "Manager")]
     Manager = 2,
-    [Display(Name = "Admin")]
-    Admin = 3,
+    [Display(Name = "SuperAdmin")]
+    SuperAdmin = 3,
 }
-

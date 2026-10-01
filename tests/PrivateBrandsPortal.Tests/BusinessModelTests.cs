@@ -18,12 +18,12 @@ public sealed class BusinessModelTests
         new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer().Options);
 
     [Fact]
-    public void Model_contains_nine_entities_and_no_cascade_deletes()
+    public void Model_contains_eleven_entities_and_no_cascade_deletes()
     {
         using var db = CreateContext();
-        Assert.Equal(9, db.Model.GetEntityTypes().Count());
+        Assert.Equal(11, db.Model.GetEntityTypes().Count());
         var foreignKeys = db.Model.GetEntityTypes().SelectMany(x => x.GetForeignKeys()).ToList();
-        Assert.Equal(9, foreignKeys.Count);
+        Assert.Equal(11, foreignKeys.Count);
         Assert.All(foreignKeys, fk => Assert.Equal(DeleteBehavior.NoAction, fk.DeleteBehavior));
     }
 

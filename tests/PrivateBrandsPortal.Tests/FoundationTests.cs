@@ -34,7 +34,7 @@ public sealed class FoundationTests
     [InlineData("/", "Recent Projects")]
     [InlineData("/Projects", "My projects")]
     [InlineData("/Approvals", "Awaiting review")]
-    [InlineData("/Administration", "Product Types")]
+    [InlineData("/Administration", "Dictionaries")]
     public async Task Authenticated_shell_renders_without_database(string path, string expected)
     {
         await using var factory = new AuthenticatedFactory();
@@ -60,14 +60,14 @@ public sealed class FoundationTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         Assert.Equal("Microsoft.EntityFrameworkCore.SqlServer", db.Database.ProviderName);
-        Assert.Equal(9, db.Model.GetEntityTypes().Count());
+        Assert.Equal(11, db.Model.GetEntityTypes().Count());
     }
 
     [Theory]
     [InlineData(null, false, false)]
     [InlineData("ProjectManager", false, false)]
     [InlineData("Manager", true, false)]
-    [InlineData("Admin", true, true)]
+    [InlineData("SuperAdmin", false, true)]
     public async Task App_role_policies_enforce_permissions(string? role, bool review, bool admin)
     {
         var services = new ServiceCollection();
@@ -76,10 +76,12 @@ public sealed class FoundationTests
         services.AddSingleton<PrivateBrandsPortal.Web.Interfaces.IAppUserService>(new PolicyAppUser(role));
         services.AddSingleton(DemoAccessTests.Access(enabled: false));
         services.AddScoped<IAuthorizationHandler, ManagerAuthorization>();
+        services.AddScoped<PrivateBrandsPortal.Web.Interfaces.IPermissionService, PrivateBrandsPortal.Web.Services.PermissionService>();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorization>();
         await using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
         var authorization = scope.ServiceProvider.GetRequiredService<IAuthorizationService>();
-        var claims = new List<Claim> { new(ClaimTypes.Name, "TEST\\reader"), new(ClaimTypes.Role, "Admin") };
+        var claims = new List<Claim> { new(ClaimTypes.Name, "TEST\\reader"), new(ClaimTypes.Role, "SuperAdmin") };
         if (role is not null) claims.Add(new(PortalAuthorization.RoleClaim, role));
         var user = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
         Assert.Equal(review, (await authorization.AuthorizeAsync(user, null, PortalAuthorization.ReviewProjects)).Succeeded);

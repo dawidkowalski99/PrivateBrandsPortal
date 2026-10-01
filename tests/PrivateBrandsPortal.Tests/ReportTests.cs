@@ -7,7 +7,7 @@ namespace PrivateBrandsPortal.Tests;
 [Collection("SQL integration")]
 public sealed class ReportTests
 {
-    private static ReportService Reports(ProjectSqlTests.Scope s)=>new(s.Db,s.Users);
+    private static ReportService Reports(ProjectSqlTests.Scope s)=>new(s.Db,new PermissionService(new PolicyAppUser("SuperAdmin")));
     private static async Task<int> Fixture(ProjectSqlTests.Scope s)
     {
         var first=WizardTests.ValidDraft();first.Brief.Customer=s.Login+" Żółć; \"Demo\"";first.Brief.CountryId=2;
