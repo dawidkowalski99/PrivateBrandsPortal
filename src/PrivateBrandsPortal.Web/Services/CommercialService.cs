@@ -12,7 +12,7 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
     private async Task<int> Owner(CancellationToken ct)
     {
         var user = await users.GetCurrentAsync(ct);
-        if (!user.IsActive || user.Role != AppRole.ProjectManager) throw new PortalAccessException();
+        if (!WorkflowAccess.Allows(user, AppRole.ProjectManager)) throw new PortalAccessException();
         return user.Id;
     }
     public async Task<CommercialForm?> FormAsync(int projectId, int productId, CancellationToken ct)

@@ -13,13 +13,13 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     private async Task<AppUser> OwnerAsync(CancellationToken ct)
     {
         var user = await users.GetCurrentAsync(ct);
-        if (!user.IsActive || user.Role != AppRole.ProjectManager) throw new PortalAccessException();
+        if (!WorkflowAccess.Allows(user, AppRole.ProjectManager)) throw new PortalAccessException();
         return user;
     }
     public async Task<int> AwaitingPmAsync(CancellationToken ct = default)
     {
         var user=await users.GetCurrentAsync(ct);
-        if(!user.IsActive || user.Role!=AppRole.ProjectManager)return 0;
+        if(!WorkflowAccess.Allows(user, AppRole.ProjectManager))return 0;
         return await db.ProjectProducts.AsNoTracking().CountAsync(x=>x.Project.ProjectManagerId==user.Id && x.CommercialStatus==null && (x.ReviewStatus==ProductReviewStatus.Approved || x.ReviewStatus==ProductReviewStatus.EditedAndApproved),ct);
     }
     public async Task<IReadOnlyList<LookupItem>> CountriesAsync(CancellationToken ct = default) =>

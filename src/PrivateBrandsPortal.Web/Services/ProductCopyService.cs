@@ -12,7 +12,7 @@ public sealed class ProductCopyService(ApplicationDbContext db, IAppUserService 
     private async Task<int> Owner(CancellationToken ct)
     {
         var user = await users.GetCurrentAsync(ct);
-        if (!user.IsActive || user.Role != AppRole.ProjectManager) throw new PortalAccessException();
+        if (!WorkflowAccess.Allows(user, AppRole.ProjectManager)) throw new PortalAccessException();
         return user.Id;
     }
     public async Task<IReadOnlyList<CopySource>> SourcesAsync(string? search, CancellationToken ct)

@@ -13,7 +13,7 @@ public sealed class ManagerAuthorization(IAppUserService users, DemoAccess demo)
         try
         {
             var user = await users.GetCurrentAsync();
-            if (user.IsActive && (requirement.Roles.Contains(user.Role) ||
+            if (user.IsActive && (requirement.Roles.Any(role => WorkflowAccess.Allows(user, role)) ||
                 (requirement.Roles.Contains(AppRole.Manager) && demo.AllowsManagerReview(user)))) context.Succeed(requirement);
         }
         catch (PortalAccessException) { }

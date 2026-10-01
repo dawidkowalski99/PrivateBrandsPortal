@@ -12,7 +12,7 @@ public sealed class ProjectAccessFilter(IAppUserService users) : IAsyncActionFil
         try
         {
             var user = await users.GetCurrentAsync(context.HttpContext.RequestAborted);
-            if (user.Role != AppRole.ProjectManager) { context.Result = new ForbidResult(); return; }
+            if (!WorkflowAccess.Allows(user, AppRole.ProjectManager)) { context.Result = new ForbidResult(); return; }
             await next();
         }
         catch (PortalAccessException) { context.Result = new ForbidResult(); }

@@ -85,7 +85,7 @@ public sealed class PermissionTests
         await using var host=baseline.WithWebHostBuilder(b=>b.ConfigureServices(s=>s.AddScoped<IAppUserService>(_=>new FixedUser(user))));
         using var client=host.CreateClient();Assert.Equal(HttpStatusCode.Unauthorized,(await client.GetAsync("/Users")).StatusCode);
         client.DefaultRequestHeaders.Add("X-Test-User","reader");
-        foreach(var path in new[]{"/","/Users","/Reports","/Reports/Export","/Dictionaries?kind=Countries"})
+        foreach(var path in new[]{"/","/Users","/Reports","/Reports/Export","/Dictionaries?kind=Countries","/Projects","/Approvals","/Archive"})
             Assert.Equal(HttpStatusCode.Forbidden,(await client.GetAsync(path)).StatusCode);
     }
     [Fact]

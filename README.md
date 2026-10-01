@@ -618,8 +618,8 @@ starsza wersja aplikacji inaczej autoryzuje dostęp.
 
 Role biznesowe nadal oznaczają ProjectManager (własne projekty i commercial)
 oraz Manager (review). SuperAdmin daje automatycznie pełne uprawnienia
-administracyjne, ale nie zastępuje ról biznesowych i nie omija Windows SSO ani
-IsActive. Nieaktywny profil nie ma dostępu do aplikacji. DemoAccess zachowuje
+administracyjne oraz dostęp do obu workflow (PM i Manager), bez pomijania Windows SSO ani
+IsActive. Projects, Copy From, commercial i Archive nadal respektują własność projektu. Nieaktywny profil nie ma dostępu do aplikacji. DemoAccess zachowuje
 wyłącznie dotychczasowy wyjątek review w Development, bez obejścia permissions.
 
 Cztery początkowe uprawnienia:
@@ -680,3 +680,17 @@ Test przeglądarkowy potwierdził Copy From i niezależną edycję Duplicate w w
 bez zapisywania dodatkowego projektu DEV.
 
 Końcowa weryfikacja 01.10.2026: build 0 błędów / 0 ostrzeżeń, 164/164 testy bez pominiętych. Zachowano wszystkie 145 wcześniejszych testów z aktualizacją oczekiwań zmienionego modelu i autoryzacji. SQL potwierdził zachowane projekty demo i cztery seedowane permissions.
+
+### SuperAdmin podczas prezentacji
+
+Od 01.10.2026 SuperAdmin może korzystać z Projects, Approvals i Archive oraz
+przeprowadzić cały scenariusz: Draft, Copy From / Duplicate, Submit, Manager Review,
+commercial status i archiwizacja. Reguła WorkflowAccess jest wspólna dla filtrów,
+polityk i serwisów. Nie zależy od DemoAccess ani od środowiska Development.
+Projects, edycja Draft, kopiowanie, commercial i Archive nadal dotyczą własnych
+projektów; kolejka review ma standardowy zakres Managera. Walidacja statusów,
+autoryzacja właściciela, audyt i kontrola współbieżności pozostają aktywne.
+Nieaktywny SuperAdmin nie ma dostępu. Zwykłe role nie otrzymują dodatkowych praw.
+Zmiana nie wymaga migracji ani dodatkowych permissions na koncie SuperAdmina.
+
+Weryfikacja rozszerzenia SuperAdmin: build 0 błędów / 0 ostrzeżeń, 168/168 testów. Windows SSO i strony Projects, Approvals, Archive sprawdzone w przeglądarce na rzeczywistym koncie SuperAdmin.

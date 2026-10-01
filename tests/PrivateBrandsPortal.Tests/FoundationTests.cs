@@ -67,7 +67,7 @@ public sealed class FoundationTests
     [InlineData(null, false, false)]
     [InlineData("ProjectManager", false, false)]
     [InlineData("Manager", true, false)]
-    [InlineData("SuperAdmin", false, true)]
+    [InlineData("SuperAdmin", true, true)]
     public async Task App_role_policies_enforce_permissions(string? role, bool review, bool admin)
     {
         var services = new ServiceCollection();

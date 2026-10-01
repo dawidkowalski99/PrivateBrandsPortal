@@ -22,7 +22,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
     private async Task<AppUser> RequireAsync(AppRole role, CancellationToken ct)
     {
         var user = await users.GetCurrentAsync(ct);
-        if (!user.IsActive || (user.Role != role && !(role == AppRole.Manager && demo.AllowsManagerReview(user)))) throw new PortalAccessException();
+        if (!WorkflowAccess.Allows(user, role) && !(role == AppRole.Manager && demo.AllowsManagerReview(user))) throw new PortalAccessException();
         return user;
     }
     private IQueryable<Project> Waiting() => db.Projects.Where(x =>
@@ -31,7 +31,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
     public async Task<int> CountAsync(CancellationToken ct = default)
     {
         var user = await users.GetCurrentAsync(ct);
-        return user.IsActive && (user.Role == AppRole.Manager || demo.AllowsManagerReview(user)) ? await Waiting().CountAsync(ct) : 0;
+        return (WorkflowAccess.Allows(user, AppRole.Manager) || demo.AllowsManagerReview(user)) ? await Waiting().CountAsync(ct) : 0;
     }
     public async Task<IReadOnlyList<ApprovalItem>> QueueAsync(CancellationToken ct = default)
     {
