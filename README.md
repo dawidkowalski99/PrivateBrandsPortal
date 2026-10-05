@@ -694,3 +694,80 @@ Nieaktywny SuperAdmin nie ma dostępu. Zwykłe role nie otrzymują dodatkowych p
 Zmiana nie wymaga migracji ani dodatkowych permissions na koncie SuperAdmina.
 
 Weryfikacja rozszerzenia SuperAdmin: build 0 błędów / 0 ostrzeżeń, 168/168 testów. Windows SSO i strony Projects, Approvals, Archive sprawdzone w przeglądarce na rzeczywistym koncie SuperAdmin.
+
+## Dashboard i transfer odpowiedzialności za projekt
+
+Dashboard był statycznym szkieletem pierwszego etapu. Obecnie IDashboardService /
+DashboardService pobiera agregaty i projekcje bezpośrednio z SQL przez EF Core,
+AsNoTracking i Select, bez pobierania grafów produktów dla kart i bez N+1.
+ProjectManager widzi tylko własne projekty; SuperAdmin widzi portfel globalny.
+Pozostałe role nie otrzymują globalnego wglądu przez Dashboard.
+
+| Karta | Reguła |
+| --- | --- |
+| My Active Projects / Active Projects | ArchivedAtUtc jest null i Status nie jest Rejected; wspólna definicja ProjectQueries.Active. Draft, Approved i PartiallyApproved mogą być aktywne. |
+| Awaiting Approval | Liczba projektów AwaitingManagerReview lub PartiallyReviewed, niezależnie od liczby SKU. |
+| Recently Changed | UpdatedAtUtc od teraz minus 7 dni do teraz, UTC; granica włączona. TimeProvider pozwala testować ten przedział. |
+| Completed | ArchivedAtUtc nie jest null; samo Approved nie wystarcza. |
+| Awaiting PM Update | Liczba SKU Approved lub EditedAndApproved bez CommercialStatus. Współdzielone ProjectService.AwaitingPmAsync i ProjectQueries.AwaitingPmUpdate. |
+
+Recent Projects pokazuje do 6 kart, UpdatedAtUtc malejąco (Id rozstrzyga remis),
+z numerem, klientem, krajem, PM, liczbą SKU, statusem i datą UTC. Pusty stan
+pojawia się tylko przy rzeczywistym braku projektów. Link View projects prowadzi
+do dotychczasowej listy własnych projektów. Awaiting PM Update otwiera listę
+odpowiednich projektów (50 na stronę), z takim samym zakresem PM / SuperAdmin.
+SuperAdmin może otworzyć cudzy projekt przez Dashboard/Project jako podgląd
+tylko do odczytu. Nie rozszerza to dostępu do Projects/Details, Edit Draft ani
+commercial — ich backend nadal sprawdza właściciela.
+
+### Transfer project
+
+Nowe uprawnienie REASSIGN_PROJECTS (Reassign projects) można nadać w Users.
+SuperAdmin otrzymuje je automatycznie przez istniejący mechanizm permissions.
+Przycisk Transfer project jest na szczegółach i globalnym podglądzie projektu.
+Formularz wymaga innego aktywnego ProjectManagera lub SuperAdmina i powodu
+(maksymalnie 1000 znaków). Zwykły Manager nie może być właścicielem docelowym.
+Brak kandydatów wyłącza przycisk i wyświetla wyjaśnienie.
+
+POST wymaga Windows Authentication, aktywnego profilu, uprawnienia i antiforgery.
+ProjectTransferService ponownie odczytuje aktywność / prawa autora oraz rolę
+i aktywność celu w transakcji RepeatableRead. Atomowy UPDATE sprawdza Id,
+poprzedniego właściciela i wersję UpdatedAtUtc przesłaną przez formularz.
+Konflikt zwraca „The project has changed. Reload it and try again.”; użytkownik
+może przeładować formularz. Nie ma automatycznego nadpisywania cudzych zmian.
+
+Zmieniają się wyłącznie ProjectManagerId i UpdatedAtUtc. Numer projektu,
+status, dane produktów, decyzje, commercial i archiwizacja pozostają zachowane.
+W tej samej transakcji powstaje AuditLog typu ProjectReassigned, pola ProjectManager:
+stary / nowy PM (nazwa, login i ID), autor, czas UTC i Reason. Nieudany zapis
+audytu cofa również właściciela i timestamp. Historia jest dostępna na szczegółach.
+Reason jest opcjonalnym polem generycznego audytu, wymaganym przez serwis transferu;
+nie kodujemy powodu w wartości nowego właściciela.
+
+Po transferze stary PM traci Projects, bezpośredni URL i możliwość zapisu starego
+wizardu. Nie usuwamy stanów z pamięci innych sesji; każda operacja i finalny zapis
+ponownie sprawdzają ownership. Nowy PM może kontynuować aktualny stan workflow
+lub otworzyć projekt w Archive. Reports agreguje po aktualnym ProjectManagerId,
+więc projekt i SKU od razu przechodzą do nowego PM. Dashboard właścicieli zmienia
+się po odczycie; globalna liczba projektów pozostaje taka sama. Recently Changed
+może wzrosnąć, jeżeli transfer aktualizuje projekt niezmieniany przez ponad 7 dni.
+
+### Migracja i weryfikacja
+
+Migracja `20261005063153_DashboardAndProjectReassignment` dodaje permission,
+nullable AuditLogs.Reason i rozszerza CHECK ChangeType o ProjectReassigned.
+Wcześniejsze migracje nie zostały zmienione. Database update w DEV zakończył się
+poprawnie. Cofnięcie migracji jest blokowane, jeśli istnieją powody / historia
+transferów albo przypisania nowego permission, aby nie utracić historii i grantów.
+
+Weryfikacja 05.10.2026: build 0 błędów / 0 ostrzeżeń, 197/197 testów.
+Nowe testy obejmują zakres i granice czasu Dashboardu, globalny podgląd, prawa
+transferu, IDOR i stary wizard, raporty, historię, zachowanie review / commercial /
+archive, konflikt równoczesnych transferów i rollback przy błędzie audytu.
+Testy SQL używają izolowanych profili PORTALTEST i usuwają tylko własne rekordy.
+
+Na rzeczywistym koncie SuperAdmin potwierdzono SSO i zgodność Dashboardu z SQL:
+Active 4, Awaiting Approval 0, Recently Changed 5, Completed 3, Awaiting PM Update
+4 SKU. Sprawdzono Dashboard i formularz transferu na desktopie i mobile.
+Ręczny transfer nie został wykonany, ponieważ DEV nie ma drugiego rzeczywistego
+aktywnego PM. Nie tworzono konta domenowego ani dodatkowego projektu demonstracyjnego.

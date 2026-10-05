@@ -9,8 +9,9 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> b)
     {
-        b.ToTable("AuditLogs", t => t.HasCheckConstraint("CK_AuditLogs_ChangeType", "[ChangeType] IN ('Created','Updated','Deleted','ManagerEdit','ProjectSubmitted')"));
+        b.ToTable("AuditLogs", t => t.HasCheckConstraint("CK_AuditLogs_ChangeType", "[ChangeType] IN ('Created','Updated','Deleted','ManagerEdit','ProjectSubmitted','ProjectReassigned')"));
         b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasMaxLength(1000);
         b.Property(x => x.EntityType).IsRequired().HasMaxLength(100);
         b.Property(x => x.FieldName).IsRequired().HasMaxLength(100);
         // Unbounded text preserves complete historical values rather than truncating them.

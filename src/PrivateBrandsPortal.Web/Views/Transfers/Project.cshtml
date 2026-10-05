@@ -1,0 +1,10 @@
+@model ProjectTransferPage
+@{ViewData["Title"]="Transfer project";}
+<div class="page-heading"><div><p class="eyebrow">@Model.ProjectNumber</p><h1>Transfer project</h1><p>Change responsibility while keeping project data, decisions and history.</p></div></div>
+<form method="post" class="panel form-panel"><div asp-validation-summary="All" class="validation-summary" role="alert"></div><input asp-for="Input.ProjectId" type="hidden"/><input name="Input.Version" value="@Model.Input.Version?.ToString("O")" type="hidden"/>
+<dl><dt>Current Project Manager</dt><dd>@Model.CurrentProjectManager</dd></dl>
+<div class="field"><label asp-for="Input.NewProjectManagerId"></label><select asp-for="Input.NewProjectManagerId" class="form-select" required><option value="">Select Project Manager</option>@foreach(var user in Model.ProjectManagers){<option value="@user.Id">@user.Name</option>}</select><span asp-validation-for="Input.NewProjectManagerId"></span></div>
+@if(Model.ProjectManagers.Count==0){<p class="wizard-note">No other active Project Manager or SuperAdmin is available.</p>}
+<div class="field mt-4"><label asp-for="Input.Reason"></label><textarea asp-for="Input.Reason" class="form-control" rows="4" maxlength="1000" required></textarea><span asp-validation-for="Input.Reason"></span></div>
+<div class="form-actions"><a class="btn btn-outline-secondary" asp-controller="@(Model.CanOpenProject?"Projects":"Dashboard")" asp-action="@(Model.CanOpenProject?"Details":"Index")" asp-route-id="@(Model.CanOpenProject?Model.Input.ProjectId:(int?)null)">Cancel</a><a asp-action="Project" asp-route-id="@Model.Input.ProjectId">Reload form</a><button class="btn btn-primary" disabled="@(Model.ProjectManagers.Count==0)">Transfer project</button></div></form>
+@section Scripts {<script src="~/lib/jquery/dist/jquery.min.js"></script><partial name="_ValidationScriptsPartial"/>}

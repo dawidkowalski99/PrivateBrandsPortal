@@ -17,7 +17,8 @@ public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permissio
             new Permission { Id = 1, Code = PermissionCodes.ManageUsers, Name = "Manage users", DisplayOrder = 10 },
             new Permission { Id = 2, Code = PermissionCodes.ManageDictionaries, Name = "Manage dictionaries", DisplayOrder = 20 },
             new Permission { Id = 3, Code = PermissionCodes.ViewReports, Name = "View reports", DisplayOrder = 30 },
-            new Permission { Id = 4, Code = PermissionCodes.ExportReports, Name = "Export reports", DisplayOrder = 40 });
+            new Permission { Id = 4, Code = PermissionCodes.ExportReports, Name = "Export reports", DisplayOrder = 40 },
+            new Permission { Id = 5, Code = PermissionCodes.ReassignProjects, Name = "Reassign projects", Description = "Allows changing the Project Manager assigned to a project.", DisplayOrder = 50 });
     }
 }
 

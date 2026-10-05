@@ -24,6 +24,8 @@ builder.Services.AddScoped<DictionaryService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<ProductCopyService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<ProjectTransferService>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissionAuthorization>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.Configure<DemoAccessOptions>(builder.Configuration.GetSection("DemoAccess"));

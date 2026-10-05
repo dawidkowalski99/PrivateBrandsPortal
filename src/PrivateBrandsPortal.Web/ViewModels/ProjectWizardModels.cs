@@ -76,6 +76,7 @@ public sealed class ProjectListItemViewModel
 }
 public sealed class ProjectDetailsViewModel
 {
+    public List<ProjectTransferHistory> Transfers { get; set; } = [];
     public DateTimeOffset? SubmittedAtUtc { get; set; }
     public DateTimeOffset? ArchivedAtUtc { get; set; }
     public int Id { get; set; }

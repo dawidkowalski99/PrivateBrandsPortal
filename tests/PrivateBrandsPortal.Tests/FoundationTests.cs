@@ -117,6 +117,7 @@ public sealed class AuthenticatedFactory : WebApplicationFactory<Program>
             // These original shell tests remain isolated from SQL. Business services have SQL integration tests.
             services.AddScoped<PrivateBrandsPortal.Web.Interfaces.IAppUserService, ShellAppUser>();
             services.AddScoped<PrivateBrandsPortal.Web.Interfaces.IProjectService, ShellProjects>();
+            services.AddScoped<PrivateBrandsPortal.Web.Interfaces.IDashboardService, ShellDashboard>();
         });
     }
 }

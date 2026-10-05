@@ -27,6 +27,9 @@ public static class ProjectDetailsReader
         var categories = await db.ProductCategories.AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         string? CategoryName(string? value) => int.TryParse(value, out var id) ? categories.GetValueOrDefault(id) : null;
         return new ProjectDetailsViewModel {
+            Transfers = await db.AuditLogs.AsNoTracking().Where(x => x.EntityType == nameof(Project) && x.EntityId == p.Id && x.ChangeType == AuditChangeType.ProjectReassigned)
+                .OrderByDescending(x => x.ChangedAtUtc).ThenByDescending(x => x.Id)
+                .Select(x => new ProjectTransferHistory(x.OldValue, x.NewValue, x.ChangedByUser.DisplayName, x.ChangedAtUtc, x.Reason)).ToListAsync(ct),
             Id = p.Id, ProjectNumber = p.ProjectNumber, Customer = p.Customer, Country = p.Country.Name,
             ProjectManager = Name(p.ProjectManager), Status = p.Status, CreatedAtUtc = p.CreatedAtUtc,
             UpdatedAtUtc = p.UpdatedAtUtc, SubmittedAtUtc = p.SubmittedAtUtc, ArchivedAtUtc = p.ArchivedAtUtc,

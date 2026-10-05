@@ -1,0 +1,5 @@
+@model AwaitingPmPage
+@{ViewData["Title"]="Awaiting PM Update";}
+<div class="page-heading"><div><p class="eyebrow">NEXT ACTION</p><h1>Awaiting PM Update</h1><p>Projects with accepted SKUs awaiting their first commercial status.</p></div></div>
+<section class="panel">@if(Model.Projects.Count==0){<div class="empty-state"><h2>All caught up</h2><p>No accepted products awaiting a PM update.</p></div>}else{<partial name="_ProjectCards" model="Model.Projects"/>}</section>
+<div class="form-actions">@if(Model.Page>1){<a asp-action="AwaitingPm" asp-route-page="@(Model.Page-1)">Previous</a>}<span>Page @Model.Page of @Model.Pages</span>@if(Model.Page<Model.Pages){<a asp-action="AwaitingPm" asp-route-page="@(Model.Page+1)">Next</a>}</div>

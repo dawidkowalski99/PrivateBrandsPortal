@@ -41,6 +41,7 @@ public sealed class SuperAdminWorkflowTests
             DemoAccessTests.Access(environment: "Production", enabled: false));
         var commercial = new CommercialService(s.Db, s.Users, TimeProvider.System);
         var copy = new ProductCopyService(s.Db, s.Users);
+        var initialAwaiting = await s.Projects.AwaitingPmAsync();
         var draft = WizardTests.ValidDraft();
         var id = await s.Projects.SaveDraftAsync(draft);
         var edit = (await s.Projects.LoadDraftAsync(id))!;
@@ -57,7 +58,7 @@ public sealed class SuperAdminWorkflowTests
         var rejection = (await review.FormAsync(id, details.Products[1].Id, ReviewDecision.Rejected))!.Input;
         rejection.RejectionReasonId = 7;
         await review.DecideAsync(rejection);
-        Assert.Equal(1, await s.Projects.AwaitingPmAsync());
+        Assert.Equal(initialAwaiting + 1, await s.Projects.AwaitingPmAsync());
         var change = (await commercial.FormAsync(id, details.Products[0].Id, default))!.Input;
         change.Status = CommercialStatus.SalesAndDelivery;
         await commercial.UpdateAsync(change);

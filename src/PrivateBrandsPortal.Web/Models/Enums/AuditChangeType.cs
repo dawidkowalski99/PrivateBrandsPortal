@@ -14,4 +14,6 @@ public enum AuditChangeType
     ManagerEdit = 4,
     [Display(Name = "Project submitted")]
     ProjectSubmitted = 5,
+    [Display(Name = "Project reassigned")]
+    ProjectReassigned = 6,
 }

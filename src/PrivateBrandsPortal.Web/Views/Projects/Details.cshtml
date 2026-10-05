@@ -1,15 +1,19 @@
 @model ProjectDetailsViewModel
+@inject PrivateBrandsPortal.Web.Interfaces.IPermissionService Permissions
 @using PrivateBrandsPortal.Web.Models.Enums
 @{ ViewData["Title"] = Model.ProjectNumber; ViewData["ProjectId"] = Model.Id; }
 @if(TempData["Error"] is string error){<div class="alert alert-danger" role="alert">@error</div>}
 @if(TempData["Success"] is string message){<div class="alert alert-success" role="status">@message</div>}
 <div class="page-heading"><div><p class="eyebrow">PROJECT DETAILS</p><h1>@Model.ProjectNumber <span class="stage-badge project-status-@Model.Status">@Html.DisplayFor(x=>x.Status)</span></h1><p>@Model.Customer</p></div>
-@if(Model.Status == ProjectStatus.Draft){<a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit Draft</a><a class="btn btn-primary" asp-action="Submit" asp-route-id="@Model.Id">Submit for Approval</a>}
+@if(Model.Status == ProjectStatus.Draft && ViewData["ReadOnly"] is not true){<a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit Draft</a><a class="btn btn-primary" asp-action="Submit" asp-route-id="@Model.Id">Submit for Approval</a>}
 </div>
+@if(await Permissions.HasAsync(PrivateBrandsPortal.Web.Services.PermissionCodes.ReassignProjects)){<a class="btn btn-outline-secondary mb-4" asp-controller="Transfers" asp-action="Project" asp-route-id="@Model.Id">Transfer project</a>}
+@if(ViewData["ReadOnly"] is true){<p class="wizard-note">Global overview · read only. PM actions remain available to the current owner.</p>}
+@if(Model.Transfers.Count>0){<section class="panel form-panel mb-4"><h2>Project Manager history</h2>@foreach(var transfer in Model.Transfers){<div class="manager-change"><h3>Project Manager changed</h3><p>@transfer.OldManager → <strong>@transfer.NewManager</strong></p><p>Changed by: @transfer.ChangedBy · @transfer.ChangedAtUtc.ToString("dd.MM.yyyy HH:mm:ss") UTC</p><p>Reason: @transfer.Reason</p></div>}</section>}
 <partial name="_DecisionSummary" model="Model" />@if(Model.ArchivedAtUtc.HasValue){<div class="alert alert-success">Archived · @Model.ArchivedAtUtc.Value.ToString("dd.MM.yyyy HH:mm") UTC — all accepted SKUs completed Sales and delivery.</div>}
 <section class="panel form-panel"><h2>Brief</h2><dl class="brief-grid"><div><dt>Customer</dt><dd>@Model.Customer</dd></div><div><dt>Country</dt><dd>@Model.Country</dd></div><div><dt>Project Manager</dt><dd>@Model.ProjectManager</dd></div><div><dt>Created (UTC)</dt><dd>@Model.CreatedAtUtc.ToString("dd.MM.yyyy HH:mm")</dd></div><div><dt>Last Updated (UTC)</dt><dd>@Model.UpdatedAtUtc.ToString("dd.MM.yyyy HH:mm")</dd></div></dl></section>
 @if(Model.SubmittedAtUtc.HasValue){<p>Submitted (UTC): @Model.SubmittedAtUtc.Value.ToString("dd.MM.yyyy HH:mm")</p>}
 <div class="section-heading"><h2>Products <span class="subtle-badge">@Model.Products.Count</span></h2></div>
-<div class="product-grid">@foreach(var product in Model.Products){<article class="panel product-card"><partial name="_ProductData" model="product" /><partial name="_ProductReview" model="product" /><partial name="_CommercialStatus" model="product" /></article>}</div>
+<div class="product-grid">@foreach(var product in Model.Products){<article class="panel product-card"><partial name="~/Views/Projects/_ProductData.cshtml" model="product" /><partial name="_ProductReview" model="product" /><partial name="_CommercialStatus" model="product" /></article>}</div>
 <div class="totals panel"><div><span>Number of Products</span><strong>@Model.Products.Count</strong></div><div><span>Total Estimated Value</span><strong>@Model.Products.Sum(x=>x.EstimatedValue).ToString("N2") <small>PLN</small></strong></div></div>
-<a asp-action="Index" class="btn btn-outline-secondary">← Back to Projects</a>
+<a asp-controller="@(ViewData["ReadOnly"] is true?"Dashboard":"Projects")" asp-action="Index" class="btn btn-outline-secondary">← Back</a>

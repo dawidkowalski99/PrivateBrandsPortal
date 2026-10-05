@@ -4,6 +4,6 @@
 <section class="manager-changes"><h4>PM Status</h4>
 @if(Model.CommercialStatus==CommercialStatus.SalesAndDelivery){<span class="stage-badge project-status-Approved">Completed</span>}
 <p>@(Model.CommercialStatus.HasValue ? EnumLabel.Text(Model.CommercialStatus.Value) : "Awaiting PM update")</p>
-@if(Model.CommercialStatus!=CommercialStatus.SalesAndDelivery){<a class="btn btn-outline-secondary" asp-controller="Commercial" asp-action="Change" asp-route-projectId="@ViewData["ProjectId"]" asp-route-productId="@Model.Id">Change status</a>}
+@if(Model.CommercialStatus!=CommercialStatus.SalesAndDelivery && ViewData["ReadOnly"] is not true){<a class="btn btn-outline-secondary" asp-controller="Commercial" asp-action="Change" asp-route-projectId="@ViewData["ProjectId"]" asp-route-productId="@Model.Id">Change status</a>}
 @if(Model.CommercialHistory.Count>0){<details><summary>Commercial Status History (@Model.CommercialHistory.Count)</summary>@foreach(var change in Model.CommercialHistory){<div class="manager-change"><p><del>@change.OldDisplay</del> → <ins>@change.NewDisplay</ins></p><small>@change.ChangedBy · @change.ChangedAtUtc.ToString("dd.MM.yyyy HH:mm:ss") UTC</small></div>}</details>}
 </section>}

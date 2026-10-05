@@ -10,6 +10,7 @@ public sealed class AuditLog
     public required string FieldName { get; set; }
     public string? OldValue { get; set; }
     public string? NewValue { get; set; }
+    public string? Reason { get; set; }
     public int ChangedByUserId { get; set; }
     public AppUser ChangedByUser { get; set; } = null!;
     public DateTimeOffset ChangedAtUtc { get; set; } = DateTimeOffset.UtcNow;

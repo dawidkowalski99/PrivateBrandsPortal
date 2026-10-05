@@ -1,12 +1,14 @@
+@model DashboardViewModel
 @{ ViewData["Title"] = "Dashboard"; }
-<div class="page-heading"><div><p class="eyebrow">YOUR WORKSPACE, CONNECTED</p><h1>Dashboard</h1><p>A clear view of your Private Brands projects.</p></div><span class="stage-badge">Foundation ready</span></div>
+<div class="page-heading"><div><p class="eyebrow">YOUR WORKSPACE, CONNECTED</p><h1>Dashboard</h1><p>@(Model.IsGlobal ? "A portfolio view across all Project Managers." : "A clear view of your Private Brands projects.")</p></div><span class="subtle-badge">@(Model.IsGlobal ? "All projects" : "Your projects")</span></div>
+@if(TempData["Success"] is string success){<div class="alert alert-success" role="status">@success</div>}
 <section class="metrics" aria-label="Project overview">
-@foreach (var metric in new[] { ("My Active Projects", "Projects you are working on", "◫"), ("Awaiting Approval", "Waiting for manager review", "◷"), ("Recently Changed", "Updates to your products", "↗"), ("Completed", "Projects delivered", "✓") })
-{
-<article class="metric-card"><div class="metric-top"><span>@metric.Item1</span><span class="metric-icon" aria-hidden="true">@metric.Item3</span></div><strong class="metric-value" aria-label="Not available">—</strong><p>@metric.Item2</p></article>
+@foreach(var metric in new[]{(Model.IsGlobal?"Active Projects":"My Active Projects",Model.ActiveProjects,"Not archived and not fully rejected","◫"),("Awaiting Approval",Model.AwaitingApproval,"Waiting for manager review","◷"),("Recently Changed",Model.RecentlyChanged,"Updated in the last 7 days","↗"),("Completed",Model.Completed,"Projects in Archive","✓")}){
+<article class="metric-card"><div class="metric-top"><span>@metric.Item1</span><span class="metric-icon" aria-hidden="true">@metric.Item4</span></div><strong class="metric-value">@metric.Item2</strong><p>@metric.Item3</p></article>
 }
 </section>
-<section class="panel"><div class="panel-heading"><div><h2>Recent Projects</h2><p>Your latest briefs and product updates.</p></div><a class="text-link" asp-controller="Projects" asp-action="Index">View projects →</a></div>
-<div class="empty-state"><span class="empty-icon" aria-hidden="true">▤</span><h3>Your next project starts here</h3><p>Briefs, products and their progress will appear in this workspace.<br />Project creation will be added in the next stages.</p><span class="subtle-badge">No project data connected yet</span></div></section>
-<div class="info-strip"><span class="info-symbol" aria-hidden="true">i</span><div><strong>A foundation for the whole project journey</strong><p>The workspace is ready. Brief creation, product review and change history will be introduced step by step.</p></div></div>
-@await Component.InvokeAsync("AwaitingPm")
+<section class="panel"><div class="panel-heading"><div><h2>Recent Projects</h2><p>Latest project updates · UTC</p></div><a class="text-link" asp-controller="Projects" asp-action="Index">View projects →</a></div>
+@if(Model.RecentProjects.Count==0){<div class="empty-state"><h3>No projects yet.</h3><p>@(Model.IsGlobal?"No projects have been created yet.":"Create your first project.")</p>@if(Model.CanCreate && !Model.IsGlobal){<a class="btn btn-primary" asp-controller="Projects" asp-action="Create">+ New Project</a>}</div>}
+else{<partial name="_ProjectCards" model="Model.RecentProjects"/>}
+</section>
+@if(Model.CanCreate){<section class="panel form-panel mt-4"><p class="eyebrow">NEXT ACTION</p><h2>Awaiting PM Update <span class="subtle-badge">@Model.AwaitingPmUpdate SKUs</span></h2><p>Accepted products with no commercial status yet.</p><a asp-action="AwaitingPm">Open projects awaiting PM update →</a></section>}

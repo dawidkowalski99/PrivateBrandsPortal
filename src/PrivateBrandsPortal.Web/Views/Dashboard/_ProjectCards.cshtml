@@ -1,0 +1,4 @@
+@model IReadOnlyList<DashboardProject>
+<div class="dashboard-projects">
+@foreach(var project in Model){<article class="dashboard-project"><div><strong>@project.ProjectNumber</strong><h3>@project.Customer</h3><span class="stage-badge project-status-@project.Status">@EnumLabel.Text(project.Status)</span></div><dl><div><dt>Country</dt><dd>@project.Country</dd></div><div><dt>Project Manager</dt><dd>@project.ProjectManager</dd></div><div><dt>SKUs</dt><dd>@project.SKUs</dd></div><div><dt>Last Updated (UTC)</dt><dd>@project.UpdatedAtUtc.ToString("dd.MM.yyyy HH:mm")</dd></div></dl><a class="btn btn-outline-primary btn-sm" asp-controller="@(project.IsOwned?"Projects":"Dashboard")" asp-action="@(project.IsOwned?"Details":"Project")" asp-route-id="@project.Id">View</a></article>}
+</div>

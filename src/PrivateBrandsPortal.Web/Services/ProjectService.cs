@@ -20,7 +20,9 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     {
         var user=await users.GetCurrentAsync(ct);
         if(!WorkflowAccess.Allows(user, AppRole.ProjectManager))return 0;
-        return await db.ProjectProducts.AsNoTracking().CountAsync(x=>x.Project.ProjectManagerId==user.Id && x.CommercialStatus==null && (x.ReviewStatus==ProductReviewStatus.Approved || x.ReviewStatus==ProductReviewStatus.EditedAndApproved),ct);
+        var query = db.ProjectProducts.AsNoTracking().AwaitingPmUpdate();
+        if(user.Role != AppRole.SuperAdmin) query = query.Where(x => x.Project.ProjectManagerId == user.Id);
+        return await query.CountAsync(ct);
     }
     public async Task<IReadOnlyList<LookupItem>> CountriesAsync(CancellationToken ct = default) =>
         await db.Countries.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)

@@ -6,6 +6,7 @@ namespace PrivateBrandsPortal.Web.Services;
 
 public static class PermissionCodes
 {
+    public const string ReassignProjects = "REASSIGN_PROJECTS";
     public const string ManageUsers = "MANAGE_USERS";
     public const string ManageDictionaries = "MANAGE_DICTIONARIES";
     public const string ViewReports = "VIEW_REPORTS";

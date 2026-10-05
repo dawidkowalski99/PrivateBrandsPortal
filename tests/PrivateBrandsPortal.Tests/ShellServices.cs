@@ -19,3 +19,10 @@ internal sealed class ShellProjects : IProjectService
     public Task<IReadOnlyList<LookupItem>> CountriesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
     public Task<IReadOnlyList<LookupItem>> ProductCategoriesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
 }
+
+internal sealed class ShellDashboard : IDashboardService
+{
+    public Task<DashboardViewModel> GetAsync(CancellationToken ct=default)=>Task.FromResult(new DashboardViewModel{CanCreate=true});
+    public Task<AwaitingPmPage> AwaitingAsync(int page,CancellationToken ct=default)=>Task.FromResult(new AwaitingPmPage([],1,1));
+    public Task<ProjectDetailsViewModel?> OverviewAsync(int id,CancellationToken ct=default)=>Task.FromResult<ProjectDetailsViewModel?>(null);
+}

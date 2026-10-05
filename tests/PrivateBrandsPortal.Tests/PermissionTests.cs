@@ -27,6 +27,7 @@ public sealed class PermissionTests
     [InlineData(PermissionCodes.ManageDictionaries)]
     [InlineData(PermissionCodes.ViewReports)]
     [InlineData(PermissionCodes.ExportReports)]
+    [InlineData(PermissionCodes.ReassignProjects)]
     public void SuperAdmin_has_all_permissions_but_inactive_profile_has_none(string code)
     {
         var user=Profile(AppRole.SuperAdmin);Assert.True(PermissionService.HasPermission(user,code));
