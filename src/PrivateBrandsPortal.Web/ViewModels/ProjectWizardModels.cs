@@ -49,7 +49,7 @@ public sealed class DraftInput
 public sealed record LookupItem(int Id, string Name);
 public sealed class WizardViewModel
 {
-    public IReadOnlyList<LookupItem> Customers { get; set; } = [];
+    public IReadOnlyList<PrivateBrandsPortal.Web.Services.CustomerOption> Customers { get; set; } = [];
     public IReadOnlyList<PrivateBrandsPortal.Web.Services.SubcategoryOption> Subcategories { get; set; } = [];
     public ProductCardViewModel Card(ProductInput product) => new(
         product.Subcategory,

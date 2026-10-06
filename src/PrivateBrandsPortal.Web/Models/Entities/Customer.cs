@@ -4,6 +4,8 @@ public sealed class Customer
     public int Id { get; set; }
     public required string Name { get; set; }
     public string? Code { get; set; }
+    public int? DefaultCountryId { get; set; }
+    public Country? DefaultCountry { get; set; }
     public bool IsActive { get; set; } = true;
     public int DisplayOrder { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }

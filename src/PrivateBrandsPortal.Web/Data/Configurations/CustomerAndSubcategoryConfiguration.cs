@@ -10,6 +10,7 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.Name).HasMaxLength(200).IsRequired().UseCollation("Latin1_General_100_CI_AS");
         b.Property(x => x.Code).HasMaxLength(50);
         b.HasIndex(x => x.Name).IsUnique();
+        b.HasOne(x => x.DefaultCountry).WithMany().HasForeignKey(x => x.DefaultCountryId).OnDelete(DeleteBehavior.NoAction);
     }
 }
 public sealed class ProductSubcategoryConfiguration : IEntityTypeConfiguration<ProductSubcategory>

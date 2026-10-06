@@ -3,13 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using PrivateBrandsPortal.Web.Data;
 using PrivateBrandsPortal.Web.ViewModels;
 namespace PrivateBrandsPortal.Web.Services;
+public sealed record CustomerOption(int Id, string Name, int? DefaultCountryId);
 public sealed record SubcategoryOption(int Id, int CategoryId, string Name);
 public sealed class ProjectDictionaryService(ApplicationDbContext db)
 {
     private Dictionary<int, SubcategoryOption>? activeSubcategories;
-    public async Task<IReadOnlyList<LookupItem>> CustomersAsync(CancellationToken ct = default) =>
+    public async Task<IReadOnlyList<CustomerOption>> CustomersAsync(CancellationToken ct = default) =>
         await db.Customers.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
-            .Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct);
+            .Select(x => new CustomerOption(x.Id, x.Name, x.DefaultCountry != null && x.DefaultCountry.IsActive ? x.DefaultCountryId : null)).ToListAsync(ct);
     public async Task<IReadOnlyList<SubcategoryOption>> SubcategoriesAsync(CancellationToken ct = default) =>
         await db.ProductSubcategories.AsNoTracking().Where(x => x.IsActive && x.ProductCategory.IsActive)
             .OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new SubcategoryOption(x.Id, x.ProductCategoryId, x.Name)).ToListAsync(ct);

@@ -7,6 +7,9 @@ public sealed class DictionaryInput : IValidatableObject
     [StringLength(50), Display(Name="Code")] public string? Code {get;set;}
     [Range(1,int.MaxValue), Display(Name="Product Category")] public int? ProductCategoryId {get;set;}
     public string? CategoryName {get;set;}
+    [Range(1,int.MaxValue),Display(Name="Default Country")] public int? DefaultCountryId {get;set;}
+    public string? DefaultCountryName {get;set;}
+    public IReadOnlyList<LookupItem> Countries {get;set;} = [];
     public IReadOnlyList<LookupItem> Categories {get;set;} = [];
     public IEnumerable<ValidationResult> Validate(ValidationContext context) {
         if(Kind==DictionaryKind.Countries && (Code is null || !System.Text.RegularExpressions.Regex.IsMatch(Code, "^[A-Za-z]{2}$")))

@@ -23,7 +23,7 @@ public sealed class BusinessModelTests
         using var db = CreateContext();
         Assert.Equal(13, db.Model.GetEntityTypes().Count());
         var foreignKeys = db.Model.GetEntityTypes().SelectMany(x => x.GetForeignKeys()).ToList();
-        Assert.Equal(14, foreignKeys.Count);
+        Assert.Equal(15, foreignKeys.Count);
         Assert.All(foreignKeys, fk => Assert.Equal(DeleteBehavior.NoAction, fk.DeleteBehavior));
     }
 

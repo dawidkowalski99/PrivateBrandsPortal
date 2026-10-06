@@ -833,3 +833,76 @@ w testach SQL i HTTP bez zmiany roli rzeczywistego konta Windows.
 Utworzony wyłącznie do tego testu Draft PB-2026-1701 usunięto wraz z jego trzema
 produktami po weryfikacji dokładnego ID/numeru/klienta/właściciela. Testowe wpisy
 słowników pozostają nieaktywne. Istniejące projekty DEV pozostawiono bez zmian.
+
+## Customer Default Country i docelowe słowniki — 06.10.2026
+
+Migracja `20261006070239_CustomerDefaultCountriesAndProductionDictionaries` dodaje
+nullable Customer.DefaultCountryId z FK NO ACTION do Countries oraz jednorazowy
+import danych biznesowych. Poprzednich migracji nie zmieniono. Import nie jest
+uruchamiany przy starcie i nie jest HasData odtwarzającym późniejsze zmiany admina.
+Administracja nadal pozwala zmieniać nazwy, kraje domyślne, DisplayOrder i aktywność.
+
+Brief otrzymuje minimalne dane domyślnego kraju w opcjach Customer. Mały skrypt
+customer-country.js ustawia Country wyłącznie po zdarzeniu zmiany Customer.
+Dla pustego lub nieaktywnego domyślnego kraju czyści wybór. Country pozostaje
+edytowalne. Back, refresh i Edit Draft nie nadpisują już zapisanego wyboru.
+Bez JavaScript użytkownik nadal może wybrać kraj ręcznie; backend waliduje aktywność
+Country i Customer dla nowych wyborów, bez wymogu zgodności z defaultem.
+Historyczne snapshoty i obsługa istniejących nieaktywnych klientów pozostają bez zmian.
+
+W DEV dodano 22 aktywnych klientów, 4 kraje (Belgium, Finland, Netherlands,
+The Czech Republic) i 27 podkategorii. Istniejące kraje i nieaktywne dane testowe
+zachowano. Face Cream przemianowano na FACE CARE z zachowaniem Id=3 i relacji;
+Body Care / Hair Care zachowały swoje ID. Aktywne kategorie i DisplayOrder to
+1 BODY CARE, 2 HAIR CARE, 3 FACE CARE. Customer i podkategorie mają kolejność
+zgodną z listami wejściowymi.
+
+| Default Country | Customers |
+| --- | --- |
+| Poland | CARREFOUR, DOZ, NATURA, POLWELL / MILA, ALBA THYMENT, BIEDRONKA, POLOMARKET, ALDI, HEBE, HERBAPOL, LIDL, BETLEY, GEMINI, ULTRAMENT |
+| Belgium | COLRUYT, PHARMA BOULEVARD, CERES PHARMA |
+| Finland | TOKMANNI |
+| Netherlands | ORCHARD, BEYOND LABELS, MDV / STYLEDRY |
+| The Czech Republic | DR.MAX |
+
+Podkategorie w kolejności DisplayOrder:
+
+- BODY CARE: LIQUID SOAP; SHOWER GEL; SHOWER GEL & SHAMPOO; BATH FOAM; BATH SALT;
+  BODY LOTION; BODY BUTTER; HAND CREAM; FOOT CREAM; INTIMATE HYGIENE;
+  CREAMY BODY SCRUB; SHOWER & PEELING; BODY MIST.
+- HAIR CARE: SHAMPOO; HAIR CONDITIONER; SHAMPOO & CONDINTIONER; HAIR MASK;
+  HAIR SPRAY; LEAVE IN CONDITIONER; HAIR SERUM; SCALP PEELING.
+- FACE CARE: FACE CREAM; MICELLAR WATER; CLEANSING GEL; CLEANSING FOAM;
+  CLEANSING MILK; FACE TONIC.
+
+Zachowano pisownię z listy użytkownika: BODY BUTTER oraz SHAMPOO & CONDINTIONER.
+Warianty BODY BUTTTER i SHAMPOO&CONDINTIONER pojawiły się tylko w pytaniach raportu,
+nie w danych wejściowych, więc nie utworzono dodatkowych aliasów. SHOWER & PEELING
+nie zawiera końcowego whitespace/NBSP. Normalizacja porównań importu obejmuje
+wielkość liter, skrajne spacje, NBSP i powtórzone białe znaki.
+
+Import używa kodów ISO i znormalizowanych nazw, zachowuje istniejące identyfikatory,
+uzupełnia tylko pusty/zgodny DefaultCountry i odrzuca niejednoznaczne dopasowania.
+Konflikt podkategorii pod inną kategorią zatrzymuje migrację zamiast ją przenosić.
+EF wykonuje migrację transakcyjnie. W DEV nie stwierdzono duplikatów ani konfliktów.
+Nie wykonano backfillu ProductSubcategoryId ani zmian snapshotów projektów.
+Automatyczny downgrade tej migracji jest zablokowany: powrót wymaga zatwierdzonej
+kopii zapasowej albo migracji naprawczej, aby nie usuwać edytowanych danych biznesowych.
+
+Weryfikacja: build 0 błędów / 0 ostrzeżeń, 222/222 testów. Testy obejmują nullable
+DefaultCountry, dane dla dropdownu, ręczny inny kraj, nieaktywne wpisy, niezmienność
+projektów po edycji słownika oraz faktyczny SQL importu w izolowanych tabelach
+tymczasowych SQL Server (początkowe dane, ponowne wykonanie, zachowanie ID, konflikty).
+Nie tworzą alternatywnej bazy ani nie modyfikują istniejących danych DEV.
+Pełny test wszystkich migracji na pustej bazie nie został wykonany: konto SQL zwróciło
+`CREATE DATABASE permission denied in database 'master'.` Do tej kontroli przed
+wdrożeniem administrator musi przygotować pustą bazę testową lub nadać uprawnienie.
+Nie zmieniano uwierzytelniania ani uprawnień SQL. Nie powstała żadna tymczasowa baza.
+
+Database update w DEV zakończony sukcesem: 7 migracji w historii, brak pending model
+changes, FK DefaultCountry z NO_ACTION, 9 Countries i 10 Rejection Reasons.
+Test Windows SSO w przeglądarce: CARREFOUR → Poland, COLRUYT → Belgium;
+ręczne CARREFOUR → Germany zaakceptowane przez Next i zachowane po Back/refresh.
+BODY CARE / HAIR CARE / FACE CARE pokazują odpowiednio 13/8/6 właściwych podkategorii;
+zmiana kategorii usuwa poprzedni wybór. Nie zapisano nowego projektu testowego.
+Copy From / Duplicate i dotychczasowy workflow pokrywa pełny zestaw testów regresji.

@@ -16,8 +16,8 @@
 <input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" />
 <div class="section-intro"><span class="eyebrow">STEP 01</span><h2>The customer brief</h2><p>Who are we creating this project for?</p></div>
 <div class="form-grid">
-<div class="field"><label asp-for="Brief.CustomerId"></label><select asp-for="Brief.CustomerId" class="form-select" required="@(!Model.Draft.ProjectId.HasValue)"><option value="">@(Model.Draft.ProjectId.HasValue && Model.Brief.CustomerId is null ? Model.Brief.Customer + " (legacy — keep current)" : "Select customer")</option>@foreach(var customer in Model.Customers){<option value="@customer.Id">@customer.Name</option>}@if(Model.Brief.CustomerId.HasValue && !Model.Customers.Any(x=>x.Id==Model.Brief.CustomerId)){<option value="@Model.Brief.CustomerId">@Model.Brief.Customer (inactive — keep current)</option>}</select><span asp-validation-for="Brief.CustomerId"></span></div>
-<div class="field"><label asp-for="Brief.CountryId"></label><select asp-for="Brief.CountryId" class="form-select" required><option value="">Select country</option>@foreach(var country in Model.Countries){<option value="@country.Id">@country.Name</option>}</select><span asp-validation-for="Brief.CountryId"></span></div>
+<div class="field"><label asp-for="Brief.CustomerId"></label><select asp-for="Brief.CustomerId" data-country-target="Brief_CountryId" class="form-select" required="@(!Model.Draft.ProjectId.HasValue)"><option value="">@(Model.Draft.ProjectId.HasValue && Model.Brief.CustomerId is null ? Model.Brief.Customer + " (legacy — keep current)" : "Select customer")</option>@foreach(var customer in Model.Customers){<option value="@customer.Id" data-default-country="@customer.DefaultCountryId">@customer.Name</option>}@if(Model.Brief.CustomerId.HasValue && !Model.Customers.Any(x=>x.Id==Model.Brief.CustomerId)){<option value="@Model.Brief.CustomerId">@Model.Brief.Customer (inactive — keep current)</option>}</select><span asp-validation-for="Brief.CustomerId"></span></div>
+<div class="field"><label asp-for="Brief.CountryId"></label><select asp-for="Brief.CountryId" class="form-select" required><option value="">Select country</option>@foreach(var country in Model.Countries){<option value="@country.Id">@country.Name</option>}</select><span asp-validation-for="Brief.CountryId"></span><small>Customer default is a suggestion. You can choose another country.</small></div>
 </div>
 <div class="form-actions"><a asp-action="Index" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary" type="submit">Next →</button></div>
 </form>
@@ -84,5 +84,5 @@ else {<button class="btn btn-primary" disabled>Continue to Summary →</button>}
 @section Scripts {
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <partial name="_ValidationScriptsPartial" />
-<script src="~/js/project-wizard.js" asp-append-version="true"></script><script type="application/json" id="subcategory-options">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Subcategories))</script><script src="~/js/subcategories.js" asp-append-version="true"></script>
+<script src="~/js/project-wizard.js" asp-append-version="true"></script><script type="application/json" id="subcategory-options">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Subcategories))</script><script src="~/js/customer-country.js" asp-append-version="true"></script><script src="~/js/subcategories.js" asp-append-version="true"></script>
 }
