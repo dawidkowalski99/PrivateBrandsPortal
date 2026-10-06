@@ -8,12 +8,18 @@ namespace PrivateBrandsPortal.Web.Controllers;
 
 [ServiceFilter(typeof(ProjectAccessFilter))]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals, ProductCopyService copies) : Controller
+public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals, ProductCopyService copies, ProjectDictionaryService lookups) : Controller
 {
-    public async Task<IActionResult> Index(CancellationToken ct) => View(await projects.ListAsync(ct));
+    public async Task<IActionResult> Index(CancellationToken ct, string? search = null) {
+        if(search?.Length>200)return BadRequest();
+        ViewData["Search"]=search; ViewData["Global"]=(await users.GetCurrentAsync(ct)).Role==Models.Enums.AppRole.SuperAdmin;
+        return View(await projects.ListAsync(ct,search));
+    }
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
         var model = await projects.DetailsAsync(id, ct);
+        if(model is null && (await users.GetCurrentAsync(ct)).Role==Models.Enums.AppRole.SuperAdmin)
+            return RedirectToAction("Project","Dashboard",new{id});
         return model is null ? NotFound() : View(model);
     }
     [HttpGet]
@@ -59,6 +65,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
         return View("Wizard", new WizardViewModel {
             Token = state.Token, Revision = state.Revision, Step = step, Draft = draft, Brief = draft.Brief,
             Product = product ?? new(), ShowProductForm = showProduct, ProjectManager = user.DisplayName,
+            Customers = await lookups.CustomersAsync(ct), Subcategories = await lookups.SubcategoriesAsync(ct),
             Countries = await projects.CountriesAsync(ct), ProductTypes = await projects.ProductCategoriesAsync(ct)
         });
     }
@@ -94,6 +101,8 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             if (state.SavedProjectId.HasValue) return RedirectToAction(nameof(Details), new { id = state.SavedProjectId });
             if (!Fresh(state, revision)) return await Page(state, 1, ct);
             input.Customer = (input.Customer ?? "").Trim();
+            try { await lookups.ResolveBriefAsync(input, state.Draft.ProjectId.HasValue ? state.Draft.Brief : null, ct); }
+            catch (ValidationException ex) { ModelState.AddModelError("Brief.CustomerId", ex.Message); }
             if (!(await projects.CountriesAsync(ct)).Any(x => x.Id == input.CountryId))
                 ModelState.AddModelError("Brief.CountryId", "Select an active country.");
             if (!ModelState.IsValid) return await Page(state, 1, ct);
@@ -107,10 +116,12 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             if (!state.BriefCompleted) return Next(state, 1);
             if (!Fresh(state, revision)) return await Page(state, 2, ct);
             input.SKU = (input.SKU ?? "").Trim(); input.Subcategory = (input.Subcategory ?? "").Trim();
-            if (!(await projects.ProductCategoriesAsync(ct)).Any(x => x.Id == input.ProductCategoryId))
-                ModelState.AddModelError("Product.ProductCategoryId", "Select an active product category.");
             var existing = state.Draft.Products.SingleOrDefault(x => x.Key == input.Key);
             input.PersistedId = existing?.PersistedId; // Never accept database IDs from the browser.
+            if (existing?.PersistedId.HasValue == true && input.ProductCategoryId == existing.ProductCategoryId)
+                ModelState.Remove("Product.ProductCategoryId");
+            try { await lookups.ResolveProductAsync(input, existing?.PersistedId.HasValue == true ? existing : null, ct); }
+            catch (ValidationException ex) { ModelState.AddModelError("Product.ProductSubcategoryId", ex.Message); }
             if (existing is null && state.Draft.Products.Count >= 500) ModelState.AddModelError("", "A draft supports up to 500 products.");
             if (!ModelState.IsValid) return await Page(state, 2, ct, input, true);
             if (existing is not null) state.Draft.Products[state.Draft.Products.IndexOf(existing)] = input;
@@ -140,6 +151,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             else if(sourceId.HasValue && !key.HasValue)copy=await copies.CopyAsync(sourceId.Value,ct);
             if(copy is null)return NotFound();
             if(!(await projects.ProductCategoriesAsync(ct)).Any(x=>x.Id==copy.ProductCategoryId))copy.ProductCategoryId=null;
+            if(!(await lookups.SubcategoriesAsync(ct)).Any(x=>x.Id==copy.ProductSubcategoryId && x.CategoryId==copy.ProductCategoryId))copy.ProductSubcategoryId=null;
             ModelState.Clear();
             return await Page(state,2,ct,copy,true);
         });

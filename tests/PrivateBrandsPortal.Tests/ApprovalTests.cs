@@ -178,15 +178,15 @@ public sealed class ApprovalTests
         Assert.All(product.Changes, x => Assert.Equal(manager.Login, x.ChangedBy));
     }
     [Fact]
-    public async Task Edit_all_six_fields_records_six_diffs()
+    public async Task Edit_fields_and_dictionary_selection_records_eight_diffs()
     {
         await using var owner = new ProjectSqlTests.Scope(); await using var manager = new ProjectSqlTests.Scope();
         var id = await Submitted(owner); await Manager(manager);
         var input = await Input(manager, id, ReviewDecision.EditedAndApproved);
-        input.Product!.ProductCategoryId = 3; input.Product.SKU = "changed"; input.Product.Quantity = 7;
+        input.Product!.ProductCategoryId = 3; input.Product.ProductSubcategoryId = (await CustomerSubcategoryTests.Subcategory(owner,3)).Id; input.Product.SKU = "changed"; input.Product.Quantity = 7;
         input.Product.EstimatedValue = 12.34m; input.Product.EstimatedMargin = 10; input.Product.FormulaStatus = FormulaStatus.NewFormula;
         await Service(manager).DecideAsync(input);
-        Assert.Equal(6, (await owner.Projects.DetailsAsync(id))!.Products[0].Changes.Count);
+        Assert.Equal(8, (await owner.Projects.DetailsAsync(id))!.Products[0].Changes.Count);
     }
     [Fact]
     public async Task Unchanged_edit_creates_review_without_fake_diffs()

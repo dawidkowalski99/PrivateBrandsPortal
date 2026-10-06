@@ -4,6 +4,8 @@ namespace PrivateBrandsPortal.Web.Data;
 
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<ProductSubcategory> ProductSubcategories => Set<ProductSubcategory>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<AppUserPermission> AppUserPermissions => Set<AppUserPermission>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -27,5 +29,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.HasSequence<long>("ProjectNumberSequence", "dbo")
             .StartsAt(1).IncrementsBy(1).IsCyclic(false);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        modelBuilder.Entity<Project>().HasOne(x => x.CustomerEntry).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.NoAction);
+        modelBuilder.Entity<ProjectProduct>().HasOne(x => x.ProductSubcategory).WithMany().HasForeignKey(x => x.ProductSubcategoryId).OnDelete(DeleteBehavior.NoAction);
     }
 }

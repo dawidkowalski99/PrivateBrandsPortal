@@ -4,6 +4,8 @@ namespace PrivateBrandsPortal.Web.Models.Entities;
 
 public sealed class ProjectProduct
 {
+    public int? ProductSubcategoryId { get; set; }
+    public ProductSubcategory? ProductSubcategory { get; set; }
     public int Id { get; set; }
     public int ProjectId { get; set; }
     public Project Project { get; set; } = null!;

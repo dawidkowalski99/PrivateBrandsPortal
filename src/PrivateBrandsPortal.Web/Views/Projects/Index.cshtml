@@ -1,9 +1,11 @@
 @model IReadOnlyList<ProjectListItemViewModel>
 @{ ViewData["Title"] = "Projects"; }
 <div class="page-heading"><div><p class="eyebrow">FROM BRIEF TO DELIVERY</p><h1>Projects</h1><p>Your customer briefs and product portfolio.</p></div><a class="btn btn-primary" asp-action="Create">+ New Project</a></div>
+<form method="get" class="panel form-panel mb-4"><label for="project-search">Search</label><div class="input-group"><input id="project-search" name="search" value="@ViewData["Search"]" maxlength="200" placeholder="Project number, customer or SKU" class="form-control"/><button class="btn btn-outline-primary">Search</button></div></form>
+@if(!string.IsNullOrWhiteSpace(ViewData["Search"] as string) && Model.Count==0){<p role="status">No matching projects.</p>}
 <section class="panel">
-<div class="panel-heading"><h2>My projects</h2><span class="subtle-badge">@Model.Count projects</span></div>
-@if(Model.Count == 0){<div class="empty-state"><span class="empty-icon">▤</span><h3>No projects yet</h3><p>Create your first Private Brands project.</p><a class="btn btn-primary" asp-action="Create">+ New Project</a></div>}
+<div class="panel-heading"><h2>@(ViewData["Global"] is true?"All projects":"My projects")</h2><span class="subtle-badge">@Model.Count projects</span></div>
+@if(Model.Count == 0){<div class="empty-state"><span class="empty-icon">▤</span><h3>@(string.IsNullOrWhiteSpace(ViewData["Search"] as string)?"No projects yet":"No matching projects")</h3><p>@(string.IsNullOrWhiteSpace(ViewData["Search"] as string)?"Create your first Private Brands project.":"Try a different project number, customer or SKU.")</p><a class="btn btn-primary" asp-action="Create">+ New Project</a></div>}
 else {
 <div class="table-responsive"><table class="table project-table"><thead><tr><th>Project Number</th><th>Customer / Country</th><th>Created (UTC)</th><th>Status</th><th>Products</th><th>Estimated Value</th><th>Last Update (UTC)</th><th></th></tr></thead><tbody>
 @foreach(var project in Model){<tr><td><a asp-action="Details" asp-route-id="@project.Id">@project.ProjectNumber</a></td><td><strong>@project.Customer</strong><small>@project.Country</small></td><td>@project.CreatedAtUtc.ToString("dd.MM.yyyy")</td><td><span class="stage-badge project-status-@project.Status">@Html.DisplayFor(_=>project.Status)</span></td><td>@project.ProductCount</td><td class="text-nowrap">@project.EstimatedValue.ToString("N2") PLN</td><td>@project.UpdatedAtUtc.ToString("dd.MM.yyyy HH:mm")</td><td><a asp-action="Details" asp-route-id="@project.Id">View</a></td></tr>}

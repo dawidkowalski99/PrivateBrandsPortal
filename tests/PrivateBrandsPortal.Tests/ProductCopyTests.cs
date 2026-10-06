@@ -25,7 +25,7 @@ public sealed class ProductCopyTests
         var denied=new ProductCopyService(stranger.Db,stranger.Users);
         Assert.Null(await denied.CopyAsync(source.Id,default));Assert.Empty(await denied.SourcesAsync(null,default));
         var copy=await copyService.CopyAsync(source.Id,default);Assert.NotNull(copy);Assert.Null(copy.PersistedId);
-        var draft=WizardTests.ValidDraft();draft.Products=[copy];var created=await owner.Projects.SaveDraftAsync(draft);
+        Assert.Empty(copy.SKU); Assert.Equal(source.ProductSubcategoryId,copy.ProductSubcategoryId); copy.SKU=source.SKU; var draft=WizardTests.ValidDraft();draft.Products=[copy];var created=await owner.Projects.SaveDraftAsync(draft);
         var saved=await owner.Db.ProjectProducts.AsNoTracking().SingleAsync(x=>x.ProjectId==created);
         Assert.Equal(ProductReviewStatus.Pending,saved.ReviewStatus);Assert.Null(saved.CommercialStatus);
         Assert.False(await owner.Db.ProductReviews.AnyAsync(x=>x.ProjectProductId==saved.Id));

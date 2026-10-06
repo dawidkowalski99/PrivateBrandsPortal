@@ -4,6 +4,8 @@ namespace PrivateBrandsPortal.Web.Models.Entities;
 
 public sealed class Project
 {
+    public int? CustomerId { get; set; }
+    public Customer? CustomerEntry { get; set; }
     public int Id { get; set; }
     public required string ProjectNumber { get; set; }
     public required string Customer { get; set; }

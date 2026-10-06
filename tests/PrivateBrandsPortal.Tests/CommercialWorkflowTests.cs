@@ -115,7 +115,7 @@ public sealed class CommercialWorkflowTests
     [InlineData("long")]
     public void New_products_require_bounded_category_and_subcategory(string missing)
     {
-        var input=WizardTests.ValidDraft();if(missing=="category")input.Products[0].ProductCategoryId=null;else input.Products[0].Subcategory=missing=="long"?new string('a',101):" ";
+        var input=WizardTests.ValidDraft();if(missing=="category")input.Products[0].ProductCategoryId=null;else if(missing=="subcategory")input.Products[0].ProductSubcategoryId=null;else input.Products[0].Subcategory=new string('a',101);
         Assert.Throws<ValidationException>(()=>ProjectService.Validate(input));
     }
     [Fact]
@@ -124,7 +124,7 @@ public sealed class CommercialWorkflowTests
         await using var s=new ProjectSqlTests.Scope();var category=new ProductCategory{Name=s.Login+" category",IsActive=false};s.Db.ProductCategories.Add(category);await s.Db.SaveChangesAsync();
         Assert.DoesNotContain(await s.Projects.ProductCategoriesAsync(),x=>x.Id==category.Id);
         var input=WizardTests.ValidDraft();input.Products[0].ProductCategoryId=category.Id;await Assert.ThrowsAsync<ValidationException>(()=>s.Projects.SaveDraftAsync(input));
-        input.Products[0].ProductCategoryId=1;input.Products[0].Subcategory="  Szampon  ";var id=await s.Projects.SaveDraftAsync(input);Assert.Equal("Szampon",(await s.Projects.DetailsAsync(id))!.Products[0].ProductType);
+        input.Products[0].ProductCategoryId=1;input.Products[0].Subcategory="  Szampon  ";var id=await s.Projects.SaveDraftAsync(input);Assert.Equal(await s.Db.ProductSubcategories.Where(x=>x.Id==DictionaryFixture.ShampooId).Select(x=>x.Name).SingleAsync(),(await s.Projects.DetailsAsync(id))!.Products[0].ProductType);
         Assert.Null(await s.Db.ProjectProducts.Where(x=>x.ProjectId==id).Select(x=>x.ProductTypeId).FirstAsync());
     }
     [Theory]

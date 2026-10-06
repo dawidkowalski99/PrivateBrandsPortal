@@ -75,6 +75,8 @@ public sealed class ProjectSqlTests
             await clean.AppUserPermissions.Where(x => ids.Contains(x.AppUserId)).ExecuteDeleteAsync();
             await clean.AppUsers.Where(x => x.DomainLogin == Login).ExecuteDeleteAsync();
             await clean.RejectionReasons.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();
+            await clean.ProductSubcategories.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();
+            await clean.Customers.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();
             await clean.ProductCategories.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();
             await Db.DisposeAsync();
         }

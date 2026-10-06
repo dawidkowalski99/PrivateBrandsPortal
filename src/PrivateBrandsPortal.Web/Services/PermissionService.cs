@@ -17,7 +17,9 @@ public sealed class PermissionService(IAppUserService users) : IPermissionServic
 {
     // AppUserService loads the profile and its grants once per HTTP request.
     public static bool HasPermission(AppUser user, string code) => user.IsActive &&
-        (user.Role == AppRole.SuperAdmin || user.Permissions.Any(x => x.Permission.IsActive && x.Permission.Code == code));
+        (code == PermissionCodes.ReassignProjects
+            ? user.Role is AppRole.Manager or AppRole.SuperAdmin
+            : user.Role == AppRole.SuperAdmin || user.Permissions.Any(x => x.Permission.IsActive && x.Permission.Code == code));
 
     public async Task<bool> HasAsync(string code, CancellationToken ct = default)
     {

@@ -6,13 +6,15 @@ using PrivateBrandsPortal.Web.Models.Entities;
 using PrivateBrandsPortal.Web.Models.Enums;
 using PrivateBrandsPortal.Web.ViewModels;
 namespace PrivateBrandsPortal.Web.Services;
-public sealed class ReportService(ApplicationDbContext db,IPermissionService permissions)
+public sealed class ReportService(ApplicationDbContext db,IPermissionService permissions,IAppUserService users)
 {
     private Task Authorize(CancellationToken ct) => permissions.RequireAsync(PermissionCodes.ViewReports, ct);
-    private IQueryable<ProjectProduct> Filter(ReportFilter f)
+    private IQueryable<ProjectProduct> Filter(ReportFilter f, AppUser user)
     {
         Validator.ValidateObject(f,new ValidationContext(f),true);
         var q=db.ProjectProducts.AsNoTracking();
+        if (!user.IsActive) throw new PortalAccessException();
+        if (user.Role == AppRole.ProjectManager) q=q.Where(x=>x.Project.ProjectManagerId==user.Id);
         if(f.ProjectManagerId.HasValue)q=q.Where(x=>x.Project.ProjectManagerId==f.ProjectManagerId);
         if(f.CountryId.HasValue)q=q.Where(x=>x.Project.CountryId==f.CountryId);
         if(f.ProjectStatus.HasValue)q=q.Where(x=>x.Project.Status==f.ProjectStatus);
@@ -34,14 +36,14 @@ public sealed class ReportService(ApplicationDbContext db,IPermissionService per
         CommercialStatus=x.CommercialStatus,CreatedAtUtc=x.Project.CreatedAtUtc,ArchivedAtUtc=x.Project.ArchivedAtUtc});
     public async Task<ReportPage> GetAsync(ReportFilter f,CancellationToken ct=default)
     {
-        await Authorize(ct);var q=Filter(f);
+        await Authorize(ct);var user=await users.GetCurrentAsync(ct);var q=Filter(f,user);
         var totals=await q.GroupBy(x=>1).Select(g=>new ReportTotals{Projects=g.Select(x=>x.ProjectId).Distinct().Count(),SKUs=g.Count(),Approved=g.Count(x=>x.ReviewStatus==ProductReviewStatus.Approved),EditedApproved=g.Count(x=>x.ReviewStatus==ProductReviewStatus.EditedAndApproved),Rejected=g.Count(x=>x.ReviewStatus==ProductReviewStatus.Rejected),Delivered=g.Count(x=>x.CommercialStatus==CommercialStatus.SalesAndDelivery)}).SingleOrDefaultAsync(ct)??new();
         var managers=await q.GroupBy(x=>new{x.Project.ProjectManagerId,x.Project.ProjectManager.DisplayName}).Select(g=>new ManagerReport{Id=g.Key.ProjectManagerId,Name=g.Key.DisplayName,Totals=new ReportTotals{Projects=g.Select(x=>x.ProjectId).Distinct().Count(),SKUs=g.Count(),Approved=g.Count(x=>x.ReviewStatus==ProductReviewStatus.Approved),EditedApproved=g.Count(x=>x.ReviewStatus==ProductReviewStatus.EditedAndApproved),Rejected=g.Count(x=>x.ReviewStatus==ProductReviewStatus.Rejected),Delivered=g.Count(x=>x.CommercialStatus==CommercialStatus.SalesAndDelivery)}}).OrderBy(x=>x.Name).ToListAsync(ct);
         var pages=Math.Max(1,(int)Math.Ceiling(totals.SKUs/50m));f.Page=Math.Min(f.Page,pages);
         return new ReportPage{Filter=f,Totals=totals,Managers=managers,Rows=await Rows(q).Skip((f.Page-1)*50).Take(50).ToListAsync(ct),
-            Users=await db.AppUsers.AsNoTracking().Where(x=>x.Projects.Any()).OrderBy(x=>x.DisplayName).Select(x=>new LookupItem(x.Id,x.DisplayName)).ToListAsync(ct),
+            Users=await db.AppUsers.AsNoTracking().Where(x=>x.Projects.Any() && (user.Role!=AppRole.ProjectManager || x.Id==user.Id)).OrderBy(x=>x.DisplayName).Select(x=>new LookupItem(x.Id,x.DisplayName)).ToListAsync(ct),
             Countries=await db.Countries.AsNoTracking().OrderBy(x=>x.DisplayOrder).ThenBy(x=>x.Name).Select(x=>new LookupItem(x.Id,x.Name)).ToListAsync(ct),
             Categories=await db.ProductCategories.AsNoTracking().OrderBy(x=>x.DisplayOrder).ThenBy(x=>x.Name).Select(x=>new LookupItem(x.Id,x.Name)).ToListAsync(ct)};
     }
-    public async Task<IAsyncEnumerable<ReportRow>> ExportAsync(ReportFilter filter,CancellationToken ct=default){await permissions.RequireAsync(PermissionCodes.ExportReports,ct);return Rows(Filter(filter)).AsAsyncEnumerable();}
+    public async Task<IAsyncEnumerable<ReportRow>> ExportAsync(ReportFilter filter,CancellationToken ct=default){await permissions.RequireAsync(PermissionCodes.ExportReports,ct);return Rows(Filter(filter,await users.GetCurrentAsync(ct))).AsAsyncEnumerable();}
 }

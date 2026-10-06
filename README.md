@@ -619,7 +619,7 @@ starsza wersja aplikacji inaczej autoryzuje dostęp.
 Role biznesowe nadal oznaczają ProjectManager (własne projekty i commercial)
 oraz Manager (review). SuperAdmin daje automatycznie pełne uprawnienia
 administracyjne oraz dostęp do obu workflow (PM i Manager), bez pomijania Windows SSO ani
-IsActive. Projects, Copy From, commercial i Archive nadal respektują własność projektu. Nieaktywny profil nie ma dostępu do aplikacji. DemoAccess zachowuje
+IsActive. Copy From i operacje edycji nadal respektują własność projektu. SuperAdmin ma globalne listy Projects i Archive oraz podgląd cudzych projektów tylko do odczytu. Nieaktywny profil nie ma dostępu do aplikacji. DemoAccess zachowuje
 wyłącznie dotychczasowy wyjątek review w Development, bez obejścia permissions.
 
 Cztery początkowe uprawnienia:
@@ -629,7 +629,7 @@ Cztery początkowe uprawnienia:
 - EXPORT_REPORTS — Export reports.
 
 Zwykły użytkownik nie otrzymuje tych uprawnień automatycznie z roli.
-Raporty nadal obejmują portfel wszystkich PM, ale teraz wymagają VIEW_REPORTS.
+Raporty wymagają VIEW_REPORTS: ProjectManager widzi wyłącznie własne projekty, a Manager i SuperAdmin portfel globalny.
 EXPORT_REPORTS jest niezależne: chroni endpoint CSV i widoczność przycisku.
 IPermissionService, policies i handler korzystają z profilu wraz z aktywnymi
 przypisaniami odczytanego raz na request. Nieaktywne Permission nie daje dostępu.
@@ -671,11 +671,11 @@ maksymalnie 100 wyników). Backend zawsze sprawdza właściciela źródła oraz 
 i wersję docelowego wizardu. POST jest chroniony antiforgery. Można kopiować także
 z własnych projektów zakończonych; produkt docelowy zawsze powstaje w Drafcie.
 
-Kopiowane są wyłącznie dane wejściowe: kategoria, subkategoria, SKU, ilość, wartość,
+Kopiowane są wyłącznie dane wejściowe: kategoria, subkategoria, ilość, wartość,
 marża i formula. Nie przechodzą ID bazy, decyzje, commercial status ani historia.
 Nieaktywna lub nieprzypisana kategoria wymaga ponownego wyboru. Użytkownik najpierw
 przegląda/edytuje kopię, potem wybiera Save product; dopiero Save Draft utrwala
-ją w bazie jako nowy produkt Pending. Źródło nie jest modyfikowane.
+ją w bazie jako nowy produkt Pending. SKU jest zawsze puste i wymaga uzupełnienia. Źródło nie jest modyfikowane.
 Test przeglądarkowy potwierdził Copy From i niezależną edycję Duplicate w wizardzie,
 bez zapisywania dodatkowego projektu DEV.
 
@@ -714,15 +714,15 @@ Pozostałe role nie otrzymują globalnego wglądu przez Dashboard.
 Recent Projects pokazuje do 6 kart, UpdatedAtUtc malejąco (Id rozstrzyga remis),
 z numerem, klientem, krajem, PM, liczbą SKU, statusem i datą UTC. Pusty stan
 pojawia się tylko przy rzeczywistym braku projektów. Link View projects prowadzi
-do dotychczasowej listy własnych projektów. Awaiting PM Update otwiera listę
+do listy własnych projektów PM lub globalnej listy SuperAdmina. Awaiting PM Update otwiera listę
 odpowiednich projektów (50 na stronę), z takim samym zakresem PM / SuperAdmin.
 SuperAdmin może otworzyć cudzy projekt przez Dashboard/Project jako podgląd
-tylko do odczytu. Nie rozszerza to dostępu do Projects/Details, Edit Draft ani
+tylko do odczytu. Projects/Details przekierowuje SuperAdmina do tego podglądu; nie rozszerza to prawa do Edit Draft ani
 commercial — ich backend nadal sprawdza właściciela.
 
 ### Transfer project
 
-Nowe uprawnienie REASSIGN_PROJECTS (Reassign projects) można nadać w Users.
+Transfer jest dostępny wyłącznie dla aktywnego Managera lub SuperAdmina. Historyczne REASSIGN_PROJECTS nie daje prawa transferu PM i nie jest już dostępne do nadawania w Users.
 SuperAdmin otrzymuje je automatycznie przez istniejący mechanizm permissions.
 Przycisk Transfer project jest na szczegółach i globalnym podglądzie projektu.
 Formularz wymaga innego aktywnego ProjectManagera lub SuperAdmina i powodu
@@ -771,3 +771,65 @@ Active 4, Awaiting Approval 0, Recently Changed 5, Completed 3, Awaiting PM Upda
 4 SKU. Sprawdzono Dashboard i formularz transferu na desktopie i mobile.
 Ręczny transfer nie został wykonany, ponieważ DEV nie ma drugiego rzeczywistego
 aktywnego PM. Nie tworzono konta domenowego ani dodatkowego projektu demonstracyjnego.
+
+## Customers, Product Subcategories i zakres danych — 06.10.2026
+
+Aktualne reguły zastępują wcześniejszy tekstowy wybór klienta i podkategorii.
+Administration → Dictionaries zawiera Customers, Countries, Product Categories,
+Product Subcategories i Rejection Reasons. Zarządzanie wymaga MANAGE_DICTIONARIES
+lub aktywnej roli SuperAdmin. Wpisy można dodawać, edytować, wyszukiwać,
+porządkować przez DisplayOrder i dezaktywować; nie ma operacji hard delete.
+
+Customer ma Name (200 znaków, unikalne bez rozróżniania wielkości liter), opcjonalne
+Code (50), IsActive, DisplayOrder i timestampy UTC. Zapis normalizuje białe znaki.
+Nowy Brief wymaga aktywnego Customer. Project.CustomerId jest nullable dla danych
+historycznych, a Project.Customer pozostaje snapshotem. Zmiana nazwy lub dezaktywacja
+słownika nie przepisuje istniejących projektów. Zmiana wyboru klienta podczas edycji
+Draftu zapisuje snapshot nowo wybranego wpisu. Nie wykonujemy automatycznego backfillu.
+
+ProductSubcategory należy do jednej ProductCategory; Name (100 znaków) jest unikalne
+w obrębie kategorii. Select zależy od wybranej kategorii, a jej zmiana czyści wybór.
+Backend sprawdza istnienie, aktywność obu wpisów i ich relację. Nowe produkty wymagają
+aktywnej podkategorii, także po Copy From / Duplicate. Istniejącej podkategorii nie
+przenosimy między kategoriami: należy dodać nowy wpis. Słowniki nie mają seedów
+z wymyślonymi klientami ani produktami.
+
+ProjectProduct.ProductSubcategoryId jest nullable; Subcategory pozostaje snapshotem,
+a ProductTypeId i fallback do ProductType.Name zachowują kompatybilność historyczną.
+Edycja ilości lub ceny istniejącego produktu nie wymusza zmiany starego słownika i
+nie aktualizuje snapshotu. Copy From / Duplicate zachowują identyfikatory wyboru oraz
+liczby i formułę, ale czyszczą SKU, ID produktu, decyzje i historię. Nieaktywne
+słowniki wymagają ponownego wyboru dla nowej kopii.
+
+PM ma zakres własnych danych w Projects, szczegółach, edycji, commercial, Archive,
+Dashboardzie, Awaiting PM Update, raportach i CSV. Zakres raportów jest nakładany
+przed filtrami, agregacją, paginacją i eksportem; podanie cudzego ProjectManagerId
+nie rozszerza dostępu. Manager i SuperAdmin mają globalny zakres raportów (z
+zachowaniem VIEW_REPORTS / EXPORT_REPORTS). Wyjątek DemoAccess pozwala PM wykonywać
+review wyłącznie własnych projektów. Transfer sprawdza rolę Manager / SuperAdmin
+również wewnątrz transakcji; historyczny grant PM nie jest wystarczający.
+
+Projects i Archive wyszukują po numerze, snapshocie Customer i SKU, po zastosowaniu
+zakresu właściciela. SuperAdmin przeszukuje wszystkie projekty i archiwum. Dostęp do
+cudzego szczegółu jest tylko do odczytu; mutacje i kopiowanie źródeł nadal sprawdzają
+własność.
+
+Migracja `20261005131116_CustomerAndSubcategoryDictionaries` dodaje dwie tabele,
+nullable FK i indeksy unikalności, bez zmiany wcześniejszych migracji oraz bez
+przepisywania snapshotów. Database update w DEV wykonany poprawnie; historia ma
+6 migracji, a `ef migrations has-pending-model-changes` potwierdza zgodność modelu.
+
+Weryfikacja: build 0 błędów / 0 ostrzeżeń, 214/214 testów. Zachowano dotychczasowe
+197 przypadków i dodano 17 obejmujących słowniki, snapshoty, historyczne rekordy,
+kopiowanie, scope raportów/CSV (także endpointy HTTP), wyszukiwanie oraz role transferu.
+Testy używają SQL Server DEV i usuwają tylko rekordy utworzone przez dany test.
+
+Test przeglądarkowy na Windows SSO / SuperAdmin: dodanie klienta, kategorii i dwóch
+podkategorii, filtrowanie zależne, reset wyboru, Duplicate i Copy From z pustym SKU,
+Save Draft, Details, Projects search po kliencie/SKU oraz Archive search po numerze.
+Po dezaktywacji klienta i podkategorii Details nadal pokazywał snapshoty. Raporty
+SuperAdmina sprawdzono w przeglądarce; PM/Manager i próby zmiany filtra sprawdzono
+w testach SQL i HTTP bez zmiany roli rzeczywistego konta Windows.
+Utworzony wyłącznie do tego testu Draft PB-2026-1701 usunięto wraz z jego trzema
+produktami po weryfikacji dokładnego ID/numeru/klienta/właściciela. Testowe wpisy
+słowników pozostają nieaktywne. Istniejące projekty DEV pozostawiono bez zmian.

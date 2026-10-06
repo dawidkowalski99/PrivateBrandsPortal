@@ -35,7 +35,7 @@ public static class ProjectDetailsReader
             UpdatedAtUtc = p.UpdatedAtUtc, SubmittedAtUtc = p.SubmittedAtUtc, ArchivedAtUtc = p.ArchivedAtUtc,
             Products = p.Products.OrderBy(x => x.Id).Select(x => new ProductCardViewModel(
                 x.Subcategory ?? x.ProductType?.Name ?? "Legacy product", x.SKU, x.Quantity, x.EstimatedValue, x.EstimatedMargin, x.FormulaStatus) {
-                Id = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, Category = x.ProductCategory?.Name, CommercialStatus = x.CommercialStatus, UpdatedAtUtc = x.UpdatedAtUtc, ReviewStatus = x.ReviewStatus,
+                Id = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, ProductSubcategoryId = x.ProductSubcategoryId, Category = x.ProductCategory?.Name, CommercialStatus = x.CommercialStatus, UpdatedAtUtc = x.UpdatedAtUtc, ReviewStatus = x.ReviewStatus,
                 Reviews = x.Reviews.OrderBy(r => r.ReviewedAtUtc).ThenBy(r => r.Id)
                     .Select(r => new ReviewHistoryItem(r.Decision, r.Comment, Name(r.Reviewer), r.ReviewedAtUtc) { RejectionReason = r.RejectionReasonName ?? r.RejectionReason?.Name }).ToList(),
                 CommercialHistory = changes.Where(a => a.EntityId == x.Id && a.FieldName == "CommercialStatus").Select(a => new ManagerChange(a.FieldName,a.OldValue,a.NewValue,Name(a.ChangedByUser),a.ChangedAtUtc)).ToList(), Changes = changes.Where(a => a.EntityId == x.Id && a.ChangeType == AuditChangeType.ManagerEdit).Select(a => new ManagerChange(a.FieldName,

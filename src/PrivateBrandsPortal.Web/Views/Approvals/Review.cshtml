@@ -1,4 +1,6 @@
 @model ProjectDetailsViewModel
+@inject PrivateBrandsPortal.Web.Interfaces.IPermissionService Permissions
+@if(await Permissions.HasAsync(PrivateBrandsPortal.Web.Services.PermissionCodes.ReassignProjects)){<a class="btn btn-outline-secondary mb-4" asp-controller="Transfers" asp-action="Project" asp-route-id="@Model.Id">Transfer project</a>}
 @using PrivateBrandsPortal.Web.Models.Enums
 @{ ViewData["Title"] = "Review " + Model.ProjectNumber; var reviewed = Model.Products.Count(x => x.ReviewStatus != ProductReviewStatus.Pending); }
 @if(TempData["Success"] is string success){<div class="alert alert-success" role="status">@success</div>}

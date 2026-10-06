@@ -4,20 +4,22 @@ namespace PrivateBrandsPortal.Web.ViewModels;
 
 public sealed class BriefInput
 {
-    [Required, StringLength(200)]
+    [Range(1, int.MaxValue), Display(Name = "Customer")] public int? CustomerId { get; set; }
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever, Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever, StringLength(200)]
     public string Customer { get; set; } = "";
     [Required, Range(1, int.MaxValue), Display(Name = "Country")]
     public int? CountryId { get; set; }
 }
 public sealed class ProductInput : IValidatableObject
 {
+    [Range(1, int.MaxValue), Display(Name = "Product Subcategory")] public int? ProductSubcategoryId { get; set; }
     public Guid Key { get; set; } = Guid.NewGuid();
     public int? PersistedId { get; set; }
     [Range(1, int.MaxValue), Display(Name = "Legacy Product Type")]
     public int? ProductTypeId { get; set; }
     [Required, Range(1, int.MaxValue), Display(Name = "Product Category")]
     public int? ProductCategoryId { get; set; }
-    [Required, StringLength(100), Display(Name = "Subcategory")]
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever, Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever, StringLength(100), Display(Name = "Subcategory")]
     public string Subcategory { get; set; } = "";
     [Required, StringLength(100)]
     public string SKU { get; set; } = "";
@@ -47,6 +49,8 @@ public sealed class DraftInput
 public sealed record LookupItem(int Id, string Name);
 public sealed class WizardViewModel
 {
+    public IReadOnlyList<LookupItem> Customers { get; set; } = [];
+    public IReadOnlyList<PrivateBrandsPortal.Web.Services.SubcategoryOption> Subcategories { get; set; } = [];
     public ProductCardViewModel Card(ProductInput product) => new(
         product.Subcategory,
         product.SKU, product.Quantity!.Value, product.EstimatedValue!.Value,
@@ -95,6 +99,7 @@ public sealed record ProductCardViewModel(string ProductType, string SKU, int Qu
     public int Id { get; init; }
     public int? ProductTypeId { get; init; }
     public int? ProductCategoryId { get; init; }
+    public int? ProductSubcategoryId { get; init; }
     public string? Category { get; init; }
     public CommercialStatus? CommercialStatus { get; init; }
     public List<ManagerChange> CommercialHistory { get; init; } = [];

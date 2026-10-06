@@ -20,8 +20,7 @@ public sealed class ProjectTransferTests
     private static async Task<AppUser> Authorize(ProjectSqlTests.Scope s, bool admin = false)
     {
         var user = await s.Users.GetCurrentAsync();
-        if (admin) await s.Db.AppUsers.Where(x => x.Id == user.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.Role, AppRole.SuperAdmin));
-        else { s.Db.AppUserPermissions.Add(new() { AppUserId = user.Id, PermissionId = 5 }); await s.Db.SaveChangesAsync(); }
+        await s.Db.AppUsers.Where(x => x.Id == user.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.Role, AppRole.SuperAdmin));
         s.Db.ChangeTracker.Clear(); return await s.Users.GetCurrentAsync();
     }
     private static async Task<ProjectTransferInput> Input(ProjectSqlTests.Scope s, int id, int target) => new() {
@@ -39,6 +38,7 @@ public sealed class ProjectTransferTests
         await s.Db.AppUsers.Where(x => x.Id == target.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.Role, role));
         var id = await s.Projects.SaveDraftAsync(WizardTests.ValidDraft());
         var before = (await s.Projects.DetailsAsync(id))!;
+        if(!admin) await s.Db.AppUsers.Where(x=>x.Id==actor.Id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Role,AppRole.Manager));
         var form = (await Service(s).FormAsync(id, default))!;
         Assert.Contains(form.ProjectManagers, x => x.Id == target.Id); Assert.DoesNotContain(form.ProjectManagers, x => x.Id == actor.Id);
         await Service(s).TransferAsync(await Input(s, id, target.Id));
@@ -60,11 +60,14 @@ public sealed class ProjectTransferTests
         await using var s = new ProjectSqlTests.Scope(); await using var next = new ProjectSqlTests.Scope();
         var actor = await Authorize(s); var target = await next.Users.GetCurrentAsync();
         var id = await s.Projects.SaveDraftAsync(WizardTests.ValidDraft()); var stale = (await s.Projects.LoadDraftAsync(id))!;
-        var reports = new ReportService(s.Db, new PermissionService(new PolicyAppUser("SuperAdmin")));
+        var reports = new ReportService(s.Db, new PermissionService(new PolicyAppUser("SuperAdmin")), new PolicyAppUser("SuperAdmin"));
+        await s.Db.AppUsers.Where(x=>x.Id==actor.Id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Role,AppRole.ProjectManager));
         Assert.Equal(1, (await DashboardTests.Service(s).GetAsync()).ActiveProjects);
         Assert.Equal(0, (await DashboardTests.Service(next).GetAsync()).ActiveProjects);
         var beforeGlobal = await s.Db.Projects.CountAsync(p => p.ArchivedAtUtc == null && p.Status != ProjectStatus.Rejected);
+        await s.Db.AppUsers.Where(x=>x.Id==actor.Id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Role,AppRole.Manager));
         await Service(s).TransferAsync(await Input(s, id, target.Id));
+        await s.Db.AppUsers.Where(x=>x.Id==actor.Id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Role,AppRole.ProjectManager));
         Assert.Null(await s.Projects.DetailsAsync(id)); Assert.Null(await s.Projects.LoadDraftAsync(id)); Assert.Empty(await s.Projects.ListAsync());
         await Assert.ThrowsAsync<ValidationException>(() => s.Projects.SaveDraftAsync(stale));
         Assert.Equal(id, Assert.Single(await next.Projects.ListAsync()).Id);
@@ -95,7 +98,7 @@ public sealed class ProjectTransferTests
         Assert.Equal(JsonSerializer.Serialize(before.Products), JsonSerializer.Serialize(after.Products));
         Assert.Null(await s.Projects.DetailsAsync(id));
         if (archived) {
-            Assert.DoesNotContain(await CommercialWorkflowTests.Commercial(s).ArchiveAsync(default), x => x.Id == id);
+            Assert.Contains(await CommercialWorkflowTests.Commercial(s).ArchiveAsync(default), x => x.Id == id); // SuperAdmin's archive is now global.
             Assert.Contains(await CommercialWorkflowTests.Commercial(next).ArchiveAsync(default), x => x.Id == id);
         } else {
             await CommercialWorkflowTests.Status(next, id, 0, CommercialStatus.OfferUnderNegotiation);
@@ -115,7 +118,7 @@ public sealed class ProjectTransferTests
         var cached = new PermissionTests.FixedUser(actor);
         var service = new ProjectTransferService(s.Db, cached, new PermissionService(cached), TimeProvider.System);
         if (kind == "inactive actor") await s.Db.AppUsers.Where(x => x.Id == actor.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.IsActive, false));
-        if (kind == "revoked grant") await s.Db.AppUserPermissions.Where(x => x.AppUserId == actor.Id).ExecuteDeleteAsync();
+        if (kind == "revoked grant") await s.Db.AppUsers.Where(x => x.Id == actor.Id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Role,AppRole.ProjectManager));
         var input = await Input(s, id, target.Id);
         await Assert.ThrowsAsync<PortalAccessException>(() => service.TransferAsync(input));
         Assert.Equal(actor.Id, await s.Db.Projects.Where(x => x.Id == id).Select(x => x.ProjectManagerId).SingleAsync());

@@ -20,5 +20,5 @@ public sealed class CommercialController(CommercialService service) : Controller
 [ServiceFilter(typeof(ProjectAccessFilter)), ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
 public sealed class ArchiveController(CommercialService service) : Controller
 {
-    public async Task<IActionResult> Index(CancellationToken ct)=>View(await service.ArchiveAsync(ct));
+    public async Task<IActionResult> Index(CancellationToken ct,string? search=null){if(search?.Length>200)return BadRequest();ViewData["Search"]=search;return View(await service.ArchiveAsync(ct,search));}
 }

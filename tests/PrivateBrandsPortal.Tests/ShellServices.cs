@@ -11,7 +11,7 @@ internal sealed class ShellAppUser(Microsoft.AspNetCore.Http.IHttpContextAccesso
 internal sealed class ShellProjects : IProjectService
 {
     public Task<int> AwaitingPmAsync(CancellationToken ct = default) => Task.FromResult(0);
-    public Task<IReadOnlyList<ProjectListItemViewModel>> ListAsync(CancellationToken ct = default) =>
+    public Task<IReadOnlyList<ProjectListItemViewModel>> ListAsync(CancellationToken ct = default, string? search = null) =>
         Task.FromResult<IReadOnlyList<ProjectListItemViewModel>>([]);
     public Task<ProjectDetailsViewModel?> DetailsAsync(int id, CancellationToken ct = default) => Task.FromResult<ProjectDetailsViewModel?>(null);
     public Task<DraftInput?> LoadDraftAsync(int id, CancellationToken ct = default) => Task.FromResult<DraftInput?>(null);

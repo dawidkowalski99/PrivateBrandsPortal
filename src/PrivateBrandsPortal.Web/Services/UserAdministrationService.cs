@@ -34,15 +34,15 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IAppUserS
     {
         await permissions.RequireAsync(PermissionCodes.ManageUsers, ct);
         var actor = await users.GetCurrentAsync(ct);
-        var target = await db.AppUsers.AsNoTracking().Include(x => x.Permissions).SingleOrDefaultAsync(x => x.Id == id, ct);
+        var target = await db.AppUsers.AsNoTracking().Include(x => x.Permissions).ThenInclude(x => x.Permission).SingleOrDefaultAsync(x => x.Id == id, ct);
         if (target is null) return null;
         if (target.Role == AppRole.SuperAdmin && actor.Role != AppRole.SuperAdmin) throw new PortalAccessException();
         return new UserEditPage {
             Input = new() { Id = id, Version = target.UpdatedAtUtc, Role = target.Role, IsActive = target.IsActive,
-                PermissionIds = target.Permissions.Select(x => x.PermissionId).ToList() },
+                PermissionIds = target.Permissions.Where(x => x.Permission.Code != PermissionCodes.ReassignProjects).Select(x => x.PermissionId).ToList() },
             DomainLogin = target.DomainLogin, DisplayName = target.DisplayName,
             CanAssignSuperAdmin = actor.Role == AppRole.SuperAdmin,
-            Permissions = await db.Permissions.AsNoTracking().OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
+            Permissions = await db.Permissions.AsNoTracking().Where(x => x.Code != PermissionCodes.ReassignProjects).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
                 .Select(x => new PermissionOption(x.Id, x.Name, x.IsActive)).ToListAsync(ct)
         };
     }
@@ -66,7 +66,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IAppUserS
         ProtectLastSuperAdmin(target, input,
             await db.AppUsers.AnyAsync(x => x.Id != target.Id && x.IsActive && x.Role == AppRole.SuperAdmin, ct));
         var ids = input.PermissionIds.Distinct().ToArray();
-        if (await db.Permissions.CountAsync(x => ids.Contains(x.Id) && x.IsActive, ct) != ids.Length)
+        if (await db.Permissions.CountAsync(x => ids.Contains(x.Id) && x.IsActive && x.Code != PermissionCodes.ReassignProjects, ct) != ids.Length)
             throw new ValidationException("Select active permissions only.");
         var now = clock.GetUtcNow();
         if (now <= target.UpdatedAtUtc) now = target.UpdatedAtUtc.AddTicks(1);

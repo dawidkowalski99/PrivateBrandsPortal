@@ -30,10 +30,10 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     public async Task<IReadOnlyList<LookupItem>> ProductCategoriesAsync(CancellationToken ct = default) =>
         await db.ProductCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
             .Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct);
-    public async Task<IReadOnlyList<ProjectListItemViewModel>> ListAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ProjectListItemViewModel>> ListAsync(CancellationToken ct = default, string? search = null)
     {
         var user = await OwnerAsync(ct);
-        return await db.Projects.AsNoTracking().Where(x => x.ProjectManagerId == user.Id && x.ArchivedAtUtc == null)
+        return await db.Projects.AsNoTracking().Where(x => (user.Role == AppRole.SuperAdmin || x.ProjectManagerId == user.Id) && x.ArchivedAtUtc == null).Search(search)
             .OrderByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.Id)
             .Select(x => new ProjectListItemViewModel {
                 Id = x.Id, ProjectNumber = x.ProjectNumber, Customer = x.Customer, Country = x.Country.Name,
@@ -50,14 +50,14 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     public async Task<DraftInput?> LoadDraftAsync(int id, CancellationToken ct = default)
     {
         var user = await OwnerAsync(ct);
-        var project = await db.Projects.AsNoTracking().Include(x => x.Products)
+        var project = await db.Projects.AsNoTracking().Include(x => x.Products).ThenInclude(x => x.ProductType)
             .SingleOrDefaultAsync(x => x.Id == id && x.ProjectManagerId == user.Id && x.Status == ProjectStatus.Draft, ct);
         if (project is null) return null;
         return new DraftInput {
             ProjectId = project.Id, OriginalUpdatedAtUtc = project.UpdatedAtUtc,
-            Brief = new BriefInput { Customer = project.Customer, CountryId = project.CountryId },
+            Brief = new BriefInput { CustomerId = project.CustomerId, Customer = project.Customer, CountryId = project.CountryId },
             Products = project.Products.OrderBy(x => x.Id).Select(x => new ProductInput {
-                PersistedId = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, Subcategory = x.Subcategory ?? "", SKU = x.SKU, Quantity = x.Quantity,
+                PersistedId = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, ProductSubcategoryId = x.ProductSubcategoryId, Subcategory = x.Subcategory ?? x.ProductType?.Name ?? "Legacy product", SKU = x.SKU, Quantity = x.Quantity,
                 EstimatedValue = x.EstimatedValue, EstimatedMargin = x.EstimatedMargin, FormulaStatus = x.FormulaStatus
             }).ToList()
         };
@@ -66,10 +66,12 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     {
         input.Brief.Customer = (input.Brief.Customer ?? "").Trim();
         Validator.ValidateObject(input.Brief, new ValidationContext(input.Brief), true);
+        if (!allowLegacyCategories && input.Brief.CustomerId is null) throw new ValidationException("Select a customer.");
         if (input.Products.Count == 0) throw new ValidationException("Add at least one product.");
         if (input.Products.Count > 500) throw new ValidationException("A draft supports up to 500 products.");
         foreach (var product in input.Products)
         {
+            if (!allowLegacyCategories && product.ProductSubcategoryId is null) throw new ValidationException("Select a product subcategory.");
             product.SKU = (product.SKU ?? "").Trim(); product.Subcategory = (product.Subcategory ?? "").Trim();
             var errors = new List<ValidationResult>();
             Validator.TryValidateObject(product, new ValidationContext(product), errors, true);
@@ -82,13 +84,9 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     public async Task<int> SaveDraftAsync(DraftInput input, CancellationToken ct = default)
     {
         var user = await OwnerAsync(ct);
-        Validate(input);
+        Validate(input, allowLegacyCategories: true);
         if (!await db.Countries.AnyAsync(x => x.Id == input.Brief.CountryId && x.IsActive, ct))
             throw new ValidationException("Select an active country.");
-        var types = input.Products.Select(p => p.ProductCategoryId!.Value).Distinct().ToArray();
-        if (await db.ProductCategories.CountAsync(x => types.Contains(x.Id) && x.IsActive, ct) != types.Length)
-            throw new ValidationException("One or more product categories are no longer active.");
-
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = clock.GetUtcNow();
         Project project;
@@ -118,6 +116,10 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
                 ProjectManagerId = user.Id, CreatedAtUtc = now, UpdatedAtUtc = now, Status = ProjectStatus.Draft };
             db.Projects.Add(project);
         }
+        var lookups = new ProjectDictionaryService(db);
+        await lookups.ResolveBriefAsync(input.Brief, input.ProjectId.HasValue
+            ? new BriefInput { CustomerId = project.CustomerId, Customer = project.Customer } : null, ct);
+        project.CustomerId = input.Brief.CustomerId;
         project.Customer = input.Brief.Customer;
         project.CountryId = input.Brief.CountryId!.Value;
         project.UpdatedAtUtc = now;
@@ -126,8 +128,15 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
             var product = item.PersistedId is int productId
                 ? project.Products.Single(x => x.Id == productId)
                 : new ProjectProduct { SKU = item.SKU, CreatedAtUtc = now, ReviewStatus = ProductReviewStatus.Pending };
+            await lookups.ResolveProductAsync(item, item.PersistedId.HasValue ? new ProductInput {
+                ProductCategoryId = product.ProductCategoryId, ProductSubcategoryId = product.ProductSubcategoryId, Subcategory = product.Subcategory ?? ""
+            } : null, ct);
             if (item.PersistedId is null) project.Products.Add(product);
-            product.ProductCategoryId = item.ProductCategoryId; product.Subcategory = item.Subcategory; // Preserve legacy ProductTypeId on existing products.
+            // Keep a historical null snapshot (ProductType fallback) when the dictionary selection is unchanged.
+            if (product.Subcategory is not null || !item.PersistedId.HasValue || product.ProductCategoryId != item.ProductCategoryId || product.ProductSubcategoryId != item.ProductSubcategoryId)
+                product.Subcategory = item.Subcategory;
+            product.ProductSubcategoryId = item.ProductSubcategoryId;
+            product.ProductCategoryId = item.ProductCategoryId; // Preserve legacy ProductTypeId on existing products.
             product.SKU = item.SKU;
             product.Quantity = item.Quantity!.Value;
             product.EstimatedValue = item.EstimatedValue!.Value;

@@ -12,7 +12,7 @@ namespace PrivateBrandsPortal.Tests;
 public sealed class SuperAdminWorkflowTests
 {
     [Theory]
-    [InlineData("/Projects", "My projects")]
+    [InlineData("/Projects", "All projects")]
     [InlineData("/Approvals", "Awaiting review")]
     [InlineData("/Archive", "Your completed projects")]
     public async Task Superadmin_can_open_workflow_pages_without_demo(string path, string expected)

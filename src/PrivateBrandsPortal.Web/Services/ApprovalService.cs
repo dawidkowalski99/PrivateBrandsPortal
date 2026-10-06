@@ -31,12 +31,12 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
     public async Task<int> CountAsync(CancellationToken ct = default)
     {
         var user = await users.GetCurrentAsync(ct);
-        return (WorkflowAccess.Allows(user, AppRole.Manager) || demo.AllowsManagerReview(user)) ? await Waiting().CountAsync(ct) : 0;
+        return (WorkflowAccess.Allows(user, AppRole.Manager) || demo.AllowsManagerReview(user)) ? await Waiting().Where(x=>user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id).CountAsync(ct) : 0;
     }
     public async Task<IReadOnlyList<ApprovalItem>> QueueAsync(CancellationToken ct = default)
     {
-        await RequireAsync(AppRole.Manager, ct);
-        var rows = await Waiting().AsNoTracking().OrderBy(x => x.SubmittedAtUtc).ThenBy(x => x.Id)
+        var user = await RequireAsync(AppRole.Manager, ct);
+        var rows = await Waiting().AsNoTracking().Where(x=>user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id).OrderBy(x => x.SubmittedAtUtc).ThenBy(x => x.Id)
             .Select(x => new { x.Id, x.ProjectNumber, x.Customer, Country = x.Country.Name,
                 x.ProjectManager.DisplayName, x.ProjectManager.DomainLogin, x.SubmittedAtUtc,
                 Products = x.Products.Count, Reviewed = x.Products.Count(p => p.ReviewStatus != ProductReviewStatus.Pending), x.Status }).ToListAsync(ct);
@@ -46,8 +46,8 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
     }
     public async Task<ProjectDetailsViewModel?> ReviewAsync(int id, CancellationToken ct = default)
     {
-        await RequireAsync(AppRole.Manager, ct);
-        return await ProjectDetailsReader.ReadAsync(db, db.Projects.Where(x => x.Id == id &&
+        var user = await RequireAsync(AppRole.Manager, ct);
+        return await ProjectDetailsReader.ReadAsync(db, db.Projects.Where(x => x.Id == id && (user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id) &&
             (x.Status == ProjectStatus.AwaitingManagerReview || x.Status == ProjectStatus.PartiallyReviewed ||
              x.Status == ProjectStatus.Approved || x.Status == ProjectStatus.Rejected || x.Status == ProjectStatus.PartiallyApproved)), ct);
     }
@@ -59,11 +59,12 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         var product = project.Products.SingleOrDefault(x => x.Id == productId && x.ReviewStatus == ProductReviewStatus.Pending);
         if (product is null) return null;
         return new ReviewFormModel { Project = project,
+            Subcategories = await new ProjectDictionaryService(db).SubcategoriesAsync(ct),
             RejectionReasons = await db.RejectionReasons.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new ReasonItem(x.Id,x.Name,x.RequiresComment)).ToListAsync(ct), ProductTypes = await db.ProductCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct),
             Input = new ReviewInput { ProjectId = projectId, ProductId = productId, ProjectVersion = project.UpdatedAtUtc,
                 ProductVersion = product.UpdatedAtUtc, Decision = decision,
                 Product = decision == ReviewDecision.EditedAndApproved ? new ProductInput {
-                    ProductCategoryId = product.ProductCategoryId, Subcategory = product.ProductType, SKU = product.SKU, Quantity = product.Quantity,
+                    ProductCategoryId = product.ProductCategoryId, ProductSubcategoryId = product.ProductSubcategoryId, Subcategory = product.ProductType, SKU = product.SKU, Quantity = product.Quantity,
                     EstimatedValue = product.EstimatedValue, EstimatedMargin = product.EstimatedMargin, FormulaStatus = product.FormulaStatus } : null }
         };
     }
@@ -120,7 +121,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = Later(input.ProjectVersion!.Value);
         // Lock the parent first: concurrent decisions on different products cannot lose the aggregate status.
-        var changed = await db.Projects.Where(x => x.Id == input.ProjectId && x.UpdatedAtUtc == input.ProjectVersion &&
+        var changed = await db.Projects.Where(x => x.Id == input.ProjectId && (user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id) && x.UpdatedAtUtc == input.ProjectVersion &&
             (x.Status == ProjectStatus.AwaitingManagerReview || x.Status == ProjectStatus.PartiallyReviewed))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.UpdatedAtUtc, now), ct);
         if (changed != 1) throw new ValidationException("The project changed or review is closed. Reopen review to continue.");
@@ -133,6 +134,8 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         if (input.Decision == ReviewDecision.EditedAndApproved)
         {
             var p = input.Product!;
+            await new ProjectDictionaryService(db).ResolveProductAsync(p, new ProductInput { ProductCategoryId=product.ProductCategoryId,
+                ProductSubcategoryId=product.ProductSubcategoryId, Subcategory=product.Subcategory ?? "" }, ct);
             void Audit(string field, object? oldValue, object? newValue)
             {
                 var oldText = Convert.ToString(oldValue, CultureInfo.InvariantCulture);
@@ -141,14 +144,17 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
                 db.AuditLogs.Add(new AuditLog { EntityType = nameof(ProjectProduct), EntityId = product.Id, FieldName = field,
                     OldValue = oldText, NewValue = newText, ChangedByUserId = user.Id, ChangedAtUtc = now, ChangeType = AuditChangeType.ManagerEdit });
             }
-            Audit(nameof(product.ProductCategoryId), product.ProductCategoryId, p.ProductCategoryId); Audit(nameof(product.Subcategory), product.Subcategory, p.Subcategory);
+            var snapshot = product.Subcategory is null && product.ProductCategoryId == p.ProductCategoryId && product.ProductSubcategoryId == p.ProductSubcategoryId ? null : p.Subcategory;
+            Audit(nameof(product.ProductSubcategoryId),product.ProductSubcategoryId,p.ProductSubcategoryId);
+            Audit(nameof(product.ProductCategoryId), product.ProductCategoryId, p.ProductCategoryId); Audit(nameof(product.Subcategory), product.Subcategory, snapshot);
             Audit(nameof(product.SKU), product.SKU, p.SKU);
             Audit(nameof(product.Quantity), product.Quantity, p.Quantity!.Value);
             // Decimal equality ignores scale: unchanged 25 and 25.00 produce no history.
             if (product.EstimatedValue != p.EstimatedValue) Audit(nameof(product.EstimatedValue), product.EstimatedValue, p.EstimatedValue!.Value);
             if (product.EstimatedMargin != p.EstimatedMargin) Audit(nameof(product.EstimatedMargin), product.EstimatedMargin, p.EstimatedMargin!.Value);
             Audit(nameof(product.FormulaStatus), product.FormulaStatus, p.FormulaStatus!.Value);
-            product.ProductCategoryId = p.ProductCategoryId; product.Subcategory = p.Subcategory; product.SKU = p.SKU; product.Quantity = p.Quantity!.Value;
+            product.ProductSubcategoryId=p.ProductSubcategoryId;
+            product.ProductCategoryId = p.ProductCategoryId; product.Subcategory = snapshot; product.SKU = p.SKU; product.Quantity = p.Quantity!.Value;
             product.EstimatedValue = p.EstimatedValue!.Value; product.EstimatedMargin = p.EstimatedMargin!.Value; product.FormulaStatus = p.FormulaStatus!.Value;
         }
         product.ReviewStatus = input.Decision switch { ReviewDecision.Approved => ProductReviewStatus.Approved,

@@ -42,6 +42,7 @@ public sealed class ReviewInput : IValidatableObject
 }
 public sealed class ReviewFormModel
 {
+    public IReadOnlyList<PrivateBrandsPortal.Web.Services.SubcategoryOption> Subcategories { get; set; } = [];
     public ProjectDetailsViewModel Project { get; set; } = new();
     public ReviewInput Input { get; set; } = new();
     public IReadOnlyList<LookupItem> ProductTypes { get; set; } = [];

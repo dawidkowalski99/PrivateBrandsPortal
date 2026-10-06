@@ -51,10 +51,11 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
             p.Products.All(x=>x.ReviewStatus==ProductReviewStatus.Rejected ||
                 ((x.ReviewStatus==ProductReviewStatus.Approved || x.ReviewStatus==ProductReviewStatus.EditedAndApproved) && x.CommercialStatus==CommercialStatus.SalesAndDelivery)))
             .ExecuteUpdateAsync(s=>s.SetProperty(p=>p.ArchivedAtUtc,now),ct);
-    public async Task<IReadOnlyList<ArchiveItem>> ArchiveAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<ArchiveItem>> ArchiveAsync(CancellationToken ct, string? search = null)
     {
         var owner=await Owner(ct);
-        return await db.Projects.AsNoTracking().Where(p=>p.ProjectManagerId==owner && p.ArchivedAtUtc!=null).OrderByDescending(p=>p.ArchivedAtUtc)
+        var global=(await users.GetCurrentAsync(ct)).Role==AppRole.SuperAdmin;
+        return await db.Projects.AsNoTracking().Where(p=>(global || p.ProjectManagerId==owner) && p.ArchivedAtUtc!=null).Search(search).OrderByDescending(p=>p.ArchivedAtUtc)
             .Select(p=>new ArchiveItem(p.Id,p.ProjectNumber,p.Customer,p.Country.Name,p.ProjectManager.DisplayName,p.Products.Count,
                 p.Products.Count(x=>x.CommercialStatus==CommercialStatus.SalesAndDelivery),p.ArchivedAtUtc)).ToListAsync(ct);
     }

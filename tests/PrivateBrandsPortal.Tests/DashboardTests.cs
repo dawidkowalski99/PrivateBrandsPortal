@@ -127,6 +127,6 @@ public sealed class DashboardTests
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("read only", html); Assert.Contains("Transfer project", html);
         Assert.DoesNotContain("Edit Draft", html); Assert.DoesNotContain("Submit for Approval", html);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/Projects/Details/{id}")).StatusCode);
+        var overview = await client.GetAsync($"/Projects/Details/{id}"); Assert.Equal(HttpStatusCode.OK, overview.StatusCode); Assert.Contains("read only", await overview.Content.ReadAsStringAsync());
     }
 }

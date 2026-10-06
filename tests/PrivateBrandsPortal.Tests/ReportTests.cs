@@ -7,12 +7,12 @@ namespace PrivateBrandsPortal.Tests;
 [Collection("SQL integration")]
 public sealed class ReportTests
 {
-    private static ReportService Reports(ProjectSqlTests.Scope s)=>new(s.Db,new PermissionService(new PolicyAppUser("SuperAdmin")));
+    private static ReportService Reports(ProjectSqlTests.Scope s)=>new(s.Db,new PermissionService(new PolicyAppUser("SuperAdmin")),new PolicyAppUser("SuperAdmin"));
     private static async Task<int> Fixture(ProjectSqlTests.Scope s)
     {
         var first=WizardTests.ValidDraft();first.Brief.Customer=s.Login+" Żółć; \"Demo\"";first.Brief.CountryId=2;
-        var id=await CommercialWorkflowTests.Submitted(s,first);await CommercialWorkflowTests.Decide(s,id,0,ReviewDecision.Approved);await CommercialWorkflowTests.Decide(s,id,1,ReviewDecision.Rejected,7);await CommercialWorkflowTests.Status(s,id,0,CommercialStatus.SalesAndDelivery);
-        var second=WizardTests.ValidDraft();second.Brief.Customer=s.Login+" active";second.Brief.CountryId=3;var secondId=await s.Projects.SaveDraftAsync(second);
+        var id=await CommercialWorkflowTests.Submitted(s,first);await s.Db.Projects.Where(x=>x.Id==id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Customer,s.Login+" Żółć; \"Demo\""));await CommercialWorkflowTests.Decide(s,id,0,ReviewDecision.Approved);await CommercialWorkflowTests.Decide(s,id,1,ReviewDecision.Rejected,7);await CommercialWorkflowTests.Status(s,id,0,CommercialStatus.SalesAndDelivery);
+        var second=WizardTests.ValidDraft();second.Brief.Customer=s.Login+" active";second.Brief.CountryId=3;var secondId=await s.Projects.SaveDraftAsync(second);await s.Db.Projects.Where(x=>x.Id==secondId).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Customer,s.Login+" active"));
         await s.Db.Projects.Where(p=>p.Id==secondId).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.CreatedAtUtc,new DateTimeOffset(2025,1,1,0,0,0,TimeSpan.Zero)));
         await s.Db.Projects.Where(p=>p.Id==id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.CreatedAtUtc,new DateTimeOffset(2026,9,30,23,59,59,TimeSpan.Zero)));
         return id;
@@ -21,7 +21,7 @@ public sealed class ReportTests
     public async Task Distinct_projects_skus_and_pm_aggregation_agree()
     {
         await using var s=new ProjectSqlTests.Scope();await using var other=new ProjectSqlTests.Scope();await Fixture(s);
-        var draft=WizardTests.ValidDraft();draft.Brief.Customer=s.Login;await other.Projects.SaveDraftAsync(draft);
+        var draft=WizardTests.ValidDraft();draft.Brief.Customer=s.Login;var otherId=await other.Projects.SaveDraftAsync(draft);await s.Db.Projects.Where(x=>x.Id==otherId).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Customer,s.Login));
         var page=await Reports(s).GetAsync(new(){Customer=s.Login});
         Assert.Equal(3,page.Totals.Projects);Assert.Equal(6,page.Totals.SKUs);Assert.Equal(2,page.Managers.Count);
         Assert.Equal(6,page.Managers.Sum(x=>x.Totals.SKUs));Assert.Equal(3,page.Managers.Sum(x=>x.Totals.Projects));
@@ -66,7 +66,7 @@ public sealed class ReportTests
     [Fact]
     public async Task Pagination_keeps_global_totals_and_export_includes_all_rows()
     {
-        await using var s=new ProjectSqlTests.Scope();var draft=WizardTests.ValidDraft();var template=draft.Products[0];draft.Products=Enumerable.Range(1,55).Select(i=>new ProductInput{ProductCategoryId=1,Subcategory="Shampoo",SKU="PAGE-"+i,Quantity=1,EstimatedValue=12.34m,EstimatedMargin=10,FormulaStatus=FormulaStatus.ReadyToGo}).ToList();await s.Projects.SaveDraftAsync(draft);
+        await using var s=new ProjectSqlTests.Scope();var draft=WizardTests.ValidDraft();var template=draft.Products[0];draft.Products=Enumerable.Range(1,55).Select(i=>new ProductInput{ProductCategoryId=1,ProductSubcategoryId=DictionaryFixture.ShampooId,Subcategory="Shampoo",SKU="PAGE-"+i,Quantity=1,EstimatedValue=12.34m,EstimatedMargin=10,FormulaStatus=FormulaStatus.ReadyToGo}).ToList();await s.Projects.SaveDraftAsync(draft);
         var f=new ReportFilter{ProjectManagerId=(await s.Users.GetCurrentAsync()).Id};var first=await Reports(s).GetAsync(f);f.Page=2;var second=await Reports(s).GetAsync(f);
         Assert.Equal(50,first.Rows.Count);Assert.Equal(5,second.Rows.Count);Assert.Equal(55,second.Totals.SKUs);Assert.Equal(1,second.Totals.Projects);
         using var stream=new MemoryStream();await ReportCsv.WriteAsync(stream,await Reports(s).ExportAsync(f),default);Assert.Equal(56,Encoding.UTF8.GetString(stream.ToArray()).Split('\n',StringSplitOptions.RemoveEmptyEntries).Length);
