@@ -37,7 +37,7 @@ public sealed class AttachmentTests
         await files.Service(s).UploadAsync(new(){ProjectId=id,Type=AttachmentType.Offer,File=File()},default);
         await files.Service(s).UploadAsync(new(){ProjectId=id,Type=AttachmentType.Calculation,File=File()},default);
         var details=(await s.Projects.DetailsAsync(id))!;
-        await CommercialWorkflowTests.Commercial(s).UpdateAsync(new(){ProjectId=id,ProductId=details.Products[0].Id,Version=details.UpdatedAtUtc,Status=CommercialStatus.SalesAndDelivery});
+        await CommercialWorkflowTests.Status(s,id,0,CommercialStatus.SalesAndDelivery);
         var offer=await s.Db.ProjectAttachments.AsNoTracking().SingleAsync(x=>x.ProjectId==id && x.AttachmentType==AttachmentType.Offer);
         await Assert.ThrowsAsync<ValidationException>(()=>files.Service(s).RemoveAsync(offer.Id,default));
         Assert.Null((await s.Db.ProjectAttachments.AsNoTracking().SingleAsync(x=>x.Id==offer.Id)).DeletedAtUtc);
@@ -152,6 +152,8 @@ public sealed class AttachmentTests
         var p=(await s.Projects.DetailsAsync(id))!.Products[0];
         await files.Service(s).UploadAsync(new(){ProjectId=id,Type=AttachmentType.Offer,File=File()},default);
         await files.Service(s).UploadAsync(new(){ProjectId=id,ProjectProductId=perSku?p.Id:null,Type=AttachmentType.Calculation,File=File()},default);
+        await CommercialWorkflowTests.Commercial(s).UpdateAsync(new(){ProjectId=id,ProductId=p.Id,Version=(await s.Projects.DetailsAsync(id))!.UpdatedAtUtc,Status=CommercialStatus.ImplementationIntoProduction});
+        await CommercialWorkflowTests.ApproveImplementation(s,id,p.Id);
         await CommercialWorkflowTests.Commercial(s).UpdateAsync(new(){ProjectId=id,ProductId=p.Id,Version=(await s.Projects.DetailsAsync(id))!.UpdatedAtUtc,Status=CommercialStatus.SalesAndDelivery});
         Assert.NotNull((await s.Projects.DetailsAsync(id))!.ArchivedAtUtc);
         var panel=(await files.Service(s).PanelAsync(id,default))!;Assert.False(panel.CanUpload);Assert.Equal(2,panel.Items.Count);

@@ -16,4 +16,4 @@ public sealed class CommercialForm
     public CommercialInput Input { get; set; } = new();
 }
 public sealed record ArchiveItem(int Id, string ProjectNumber, string Customer, string Country,
-    string ProjectManager, int Products, int Completed, DateTimeOffset? ArchivedAtUtc);
+    string ProjectManager, int Products, int Completed, DateTimeOffset? ArchivedAtUtc,string? CustomerRejectionReason=null);

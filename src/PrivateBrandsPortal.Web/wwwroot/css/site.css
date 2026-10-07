@@ -508,3 +508,10 @@ dt {font-weight:400;color:var(--muted);font-size:12px;margin-bottom:6px}dd {font
 .report-table {min-width:2100px}.report-table td {max-width:240px;overflow-wrap:anywhere}.table-responsive {max-width:100%;overflow-x:auto}
 @media(max-width:640px){.report-filters .form-grid{grid-template-columns:1fr}.report-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .dashboard-projects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:1.5rem}.dashboard-project{border:1px solid #e4eaf0;border-radius:14px;padding:1.25rem;min-width:0}.dashboard-project h3{font-size:1.1rem;margin:.5rem 0;overflow-wrap:anywhere}.dashboard-project dl{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin:1rem 0}.dashboard-project dt{font-size:.75rem;color:#738295}.dashboard-project dd{font-size:.85rem;margin:0;overflow-wrap:anywhere}@media(max-width:767px){.dashboard-projects{grid-template-columns:1fr;padding:1rem}}
+.workflow-feedback { position:fixed; inset:0; pointer-events:none; z-index:1050; }
+.workflow-feedback.delivered span { position:absolute; left:var(--x); top:-12px; width:7px; height:11px; background:#159e9a; animation:workflow-fall 1.8s var(--delay) ease-in forwards; }
+.workflow-feedback.delivered span:nth-child(even) { background:#4077d6; }
+.workflow-feedback.closed { border:5px solid #94a3b866; animation:workflow-fade 1.4s ease-out forwards; }
+@keyframes workflow-fall { to { transform:translateY(65vh) rotate(220deg); opacity:0; } }
+@keyframes workflow-fade { to { opacity:0; } }
+@media(prefers-reduced-motion:reduce) { .workflow-feedback { display:none; } }

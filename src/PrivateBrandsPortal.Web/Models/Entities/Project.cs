@@ -4,6 +4,13 @@ namespace PrivateBrandsPortal.Web.Models.Entities;
 
 public sealed class Project
 {
+    public int? CustomerRejectionReasonId {get;set;}
+    public CustomerRejectionReason? CustomerRejectionReason {get;set;}
+    public string? CustomerRejectionReasonName {get;set;}
+    public string? CustomerRejectionComment {get;set;}
+    public DateTimeOffset? CustomerRejectedAtUtc {get;set;}
+    public int? CustomerRejectedByUserId {get;set;}
+    public AppUser? CustomerRejectedByUser {get;set;}
     public int? CustomerId { get; set; }
     public Customer? CustomerEntry { get; set; }
     public int Id { get; set; }

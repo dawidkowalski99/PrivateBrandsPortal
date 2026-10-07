@@ -11,7 +11,7 @@ public static class ProjectDetailsReader
     public static async Task<ProjectDetailsViewModel?> ReadAsync(ApplicationDbContext db, IQueryable<Project> query, CancellationToken ct)
     {
         var p = await query.AsNoTracking().Include(x => x.Country).Include(x => x.ProjectManager)
-            .Include(x => x.Products).ThenInclude(x => x.FormulaOption).Include(x => x.Products).ThenInclude(x => x.ProductType).Include(x => x.Products).ThenInclude(x => x.ProductCategory)
+            .Include(x=>x.CustomerRejectedByUser).Include(x=>x.Products).ThenInclude(x=>x.ImplementationApprovals).ThenInclude(x=>x.Reviewer).Include(x=>x.Products).ThenInclude(x=>x.ImplementationApprovals).ThenInclude(x=>x.RequestedByUser).Include(x => x.Products).ThenInclude(x => x.FormulaOption).Include(x => x.Products).ThenInclude(x => x.ProductType).Include(x => x.Products).ThenInclude(x => x.ProductCategory)
             .Include(x => x.Products).ThenInclude(x => x.Reviews).ThenInclude(x => x.Reviewer).Include(x => x.Products).ThenInclude(x => x.Reviews).ThenInclude(x => x.RejectionReason)
             .AsSplitQuery().SingleOrDefaultAsync(ct);
         if (p is null) return null;
@@ -30,12 +30,12 @@ public static class ProjectDetailsReader
             Transfers = await db.AuditLogs.AsNoTracking().Where(x => x.EntityType == nameof(Project) && x.EntityId == p.Id && x.ChangeType == AuditChangeType.ProjectReassigned)
                 .OrderByDescending(x => x.ChangedAtUtc).ThenByDescending(x => x.Id)
                 .Select(x => new ProjectTransferHistory(x.OldValue, x.NewValue, x.ChangedByUser.DisplayName, x.ChangedAtUtc, x.Reason)).ToListAsync(ct),
-            RequiresManagerApproval=p.RequiresManagerApproval, ProjectManagerId=p.ProjectManagerId, Id = p.Id, ProjectNumber = p.ProjectNumber, Customer = p.Customer, Country = p.Country.Name,
+            CustomerRejectionReason=p.CustomerRejectionReasonName,CustomerRejectionComment=p.CustomerRejectionComment,CustomerRejectedAtUtc=p.CustomerRejectedAtUtc,CustomerRejectedBy=p.CustomerRejectedByUser?.DisplayName,RequiresManagerApproval=p.RequiresManagerApproval, ProjectManagerId=p.ProjectManagerId, Id = p.Id, ProjectNumber = p.ProjectNumber, Customer = p.Customer, Country = p.Country.Name,
             ProjectManager = Name(p.ProjectManager), Status = p.Status, CreatedAtUtc = p.CreatedAtUtc,
             UpdatedAtUtc = p.UpdatedAtUtc, SubmittedAtUtc = p.SubmittedAtUtc, ArchivedAtUtc = p.ArchivedAtUtc,
             Products = p.Products.OrderBy(x => x.Id).Select(x => new ProductCardViewModel(
                 x.Subcategory ?? x.ProductType?.Name ?? "Legacy product", x.SKU, x.Quantity, x.EstimatedValue, x.EstimatedMargin, x.FormulaStatus) {
-                FormulaOptionId=x.FormulaOptionId, FormulaName=x.FormulaOption?.Name, Id = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, ProductSubcategoryId = x.ProductSubcategoryId, Category = x.ProductCategory?.Name, CommercialStatus = x.CommercialStatus, UpdatedAtUtc = x.UpdatedAtUtc, ReviewStatus = x.ReviewStatus,
+                ImplementationHistory=x.ImplementationApprovals.OrderBy(a=>a.Id).Select(a=>new ImplementationHistory(a.Id,a.Status,a.RequestedAtUtc,a.RequestedByUser.DisplayName,a.ReviewedAtUtc,a.Reviewer?.DisplayName,a.Comment)).ToList(),FormulaOptionId=x.FormulaOptionId, FormulaName=x.FormulaOption?.Name, Id = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, ProductSubcategoryId = x.ProductSubcategoryId, Category = x.ProductCategory?.Name, CommercialStatus = x.CommercialStatus, UpdatedAtUtc = x.UpdatedAtUtc, ReviewStatus = x.ReviewStatus,
                 Reviews = x.Reviews.OrderBy(r => r.ReviewedAtUtc).ThenBy(r => r.Id)
                     .Select(r => new ReviewHistoryItem(r.Decision, r.Comment, Name(r.Reviewer), r.ReviewedAtUtc) { RejectionReason = r.RejectionReasonName ?? r.RejectionReason?.Name }).ToList(),
                 CommercialHistory = changes.Where(a => a.EntityId == x.Id && a.FieldName == "CommercialStatus").Select(a => new ManagerChange(a.FieldName,a.OldValue,a.NewValue,Name(a.ChangedByUser),a.ChangedAtUtc)).ToList(), Changes = changes.Where(a => a.EntityId == x.Id && a.ChangeType == AuditChangeType.ManagerEdit).Select(a => new ManagerChange(a.FieldName,

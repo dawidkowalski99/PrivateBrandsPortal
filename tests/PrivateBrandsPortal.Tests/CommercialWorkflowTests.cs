@@ -33,10 +33,21 @@ public sealed class CommercialWorkflowTests
                 s.Db.ProjectAttachments.Add(new ProjectAttachment{ProjectId=id,AttachmentType=type,OriginalFileName="Fixture.xlsx",StorageKey=$"projects/{id}/{Guid.NewGuid():N}.xlsx",ContentType="application/octet-stream",FileSize=1,UploadedByUserId=actor,UploadedAtUtc=DateTimeOffset.UtcNow});
         await s.Db.SaveChangesAsync();
     }
+    internal static async Task ApproveImplementation(ProjectSqlTests.Scope s,int id,int productId)
+    {
+        var reviewer=await s.Db.AppUsers.SingleOrDefaultAsync(x=>x.DomainLogin==s.Login+"-reviewer");
+        if(reviewer is null){reviewer=new(){DomainLogin=s.Login+"-reviewer",DisplayName="Test implementation reviewer",Role=AppRole.Manager,IsActive=true};s.Db.AppUsers.Add(reviewer);await s.Db.SaveChangesAsync();}
+        var approval=await s.Db.ImplementationApprovals.AsNoTracking().SingleAsync(x=>x.ProjectProductId==productId && x.Status==ImplementationApprovalStatus.Pending);
+        await new ImplementationService(s.Db,new PermissionTests.FixedUser(reviewer),TimeProvider.System).DecideAsync(new(){Id=approval.Id,Version=(await s.Projects.DetailsAsync(id))!.UpdatedAtUtc,Decision=ImplementationApprovalStatus.Approved},default);
+    }
     internal static async Task Status(ProjectSqlTests.Scope s,int id,int index,CommercialStatus status)
     {
-        if(status==CommercialStatus.SalesAndDelivery) await SupplyDocuments(s,id);
+        if(status is CommercialStatus.SalesAndDelivery or CommercialStatus.ImplementationIntoProduction) await SupplyDocuments(s,id);
         var product=(await s.Projects.DetailsAsync(id))!.Products[index];
+        if(status==CommercialStatus.SalesAndDelivery){
+            if(product.CommercialStatus!=CommercialStatus.ImplementationIntoProduction)await Status(s,id,index,CommercialStatus.ImplementationIntoProduction);
+            await ApproveImplementation(s,id,product.Id);
+        }
         var form=(await Commercial(s).FormAsync(id,product.Id,default))!;form.Input.Status=status;
         await Commercial(s).UpdateAsync(form.Input);
     }
@@ -60,10 +71,10 @@ public sealed class CommercialWorkflowTests
         Assert.Equal(0,await s.Projects.AwaitingPmAsync());
     }
     [Fact]
-    public async Task All_accepted_skus_must_finish_and_customer_rejection_is_not_archive()
+    public async Task All_accepted_skus_must_finish_before_positive_archive()
     {
         await using var s=new ProjectSqlTests.Scope();var id=await Submitted(s);await Decide(s,id,0,ReviewDecision.Approved);await Decide(s,id,1,ReviewDecision.Approved);
-        await Status(s,id,0,CommercialStatus.SalesAndDelivery);await Status(s,id,1,CommercialStatus.CustomerNotApproved);
+        await Status(s,id,0,CommercialStatus.SalesAndDelivery);await Assert.ThrowsAsync<ValidationException>(()=>Status(s,id,1,CommercialStatus.CustomerNotApproved));
         Assert.Null((await s.Projects.DetailsAsync(id))!.ArchivedAtUtc);
         await Status(s,id,1,CommercialStatus.SalesAndDelivery);var p=(await s.Projects.DetailsAsync(id))!;Assert.NotNull(p.ArchivedAtUtc);Assert.Equal(ProjectStatus.Approved,p.Status);
         await CommercialService.ArchiveIfCompleteAsync(s.Db,id,DateTimeOffset.UtcNow.AddDays(1),default);

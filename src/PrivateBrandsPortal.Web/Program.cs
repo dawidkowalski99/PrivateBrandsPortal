@@ -26,7 +26,7 @@ var maxUploadBytes=builder.Configuration.GetValue<int?>("FileStorage:MaxFileSize
 var maxRequestBytes=checked((long)Math.Clamp(maxUploadBytes,1,1024)*1024*1024*10+1024*1024);
 builder.WebHost.ConfigureKestrel(o=>o.Limits.MaxRequestBodySize=maxRequestBytes);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o=>o.MultipartBodyLengthLimit=maxRequestBytes);
-builder.Services.AddScoped<CommercialService>();
+builder.Services.AddScoped<CommercialService>(); builder.Services.AddScoped<ImplementationService>(); builder.Services.AddScoped<CustomerClosureService>(); builder.Services.AddScoped<DictionaryDeletionService>();
 builder.Services.AddScoped<DictionaryService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<UserAdministrationService>();

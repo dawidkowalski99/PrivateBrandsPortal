@@ -9,10 +9,10 @@ public static class ReportCsv
     public static async Task WriteAsync(Stream stream,IAsyncEnumerable<ReportRow> rows,CancellationToken ct)
     {
         await using var writer=new StreamWriter(stream,new UTF8Encoding(true),65536,leaveOpen:true);
-        await writer.WriteLineAsync("Project Number;Project Manager;Customer;Country;Project Status;Category;Subcategory;Formula;SKU;Quantity;Estimated Value PLN;Estimated Margin %;Manager Decision;Rejection Reason;Commercial Status;Created UTC;Archived UTC".AsMemory(),ct);
+        await writer.WriteLineAsync("Project Number;Project Manager;Customer;Country;Project Status;Category;Subcategory;Formula;SKU;Quantity;Estimated Value PLN;Estimated Margin %;Manager Decision;Rejection Reason;Commercial Status;Created UTC;Archived UTC;Implementation Approval;Customer Rejection Reason".AsMemory(),ct);
         var culture=CultureInfo.GetCultureInfo("pl-PL");
         await foreach(var r in rows.WithCancellation(ct)){
-            var cells=new[]{r.ProjectNumber,r.ProjectManager,r.Customer,r.Country,EnumLabel.Text(r.ProjectStatus),r.Category,r.Subcategory,r.Formula,r.SKU,r.Quantity.ToString(CultureInfo.InvariantCulture),r.EstimatedValue.ToString("F2",culture),r.EstimatedMargin.ToString("F2",culture),EnumLabel.Text(r.ReviewStatus),r.RejectionReason,r.CommercialStatus.HasValue?EnumLabel.Text(r.CommercialStatus.Value):"",r.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"),r.ArchivedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss")};
+            var cells=new[]{r.ProjectNumber,r.ProjectManager,r.Customer,r.Country,EnumLabel.Text(r.ProjectStatus),r.Category,r.Subcategory,r.Formula,r.SKU,r.Quantity.ToString(CultureInfo.InvariantCulture),r.EstimatedValue.ToString("F2",culture),r.EstimatedMargin.ToString("F2",culture),EnumLabel.Text(r.ReviewStatus),r.RejectionReason,r.CommercialStatus.HasValue?EnumLabel.Text(r.CommercialStatus.Value):"",r.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"),r.ArchivedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss"),r.ImplementationStatus?.ToString(),r.CustomerRejectionReason};
             await writer.WriteLineAsync(string.Join(';',cells.Select(Cell)).AsMemory(),ct);
         }
         await writer.FlushAsync(ct);

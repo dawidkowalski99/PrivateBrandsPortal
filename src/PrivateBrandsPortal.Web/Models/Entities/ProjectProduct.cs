@@ -4,6 +4,7 @@ namespace PrivateBrandsPortal.Web.Models.Entities;
 
 public sealed class ProjectProduct
 {
+    public ICollection<ImplementationApproval> ImplementationApprovals {get;set;} = new List<ImplementationApproval>();
     public int? ProductSubcategoryId { get; set; }
     public ProductSubcategory? ProductSubcategory { get; set; }
     public int Id { get; set; }

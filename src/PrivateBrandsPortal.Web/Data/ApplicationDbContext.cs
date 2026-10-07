@@ -4,6 +4,8 @@ namespace PrivateBrandsPortal.Web.Data;
 
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
+    public DbSet<CustomerRejectionReason> CustomerRejectionReasons => Set<CustomerRejectionReason>();
+    public DbSet<ImplementationApproval> ImplementationApprovals => Set<ImplementationApproval>();
     public DbSet<FormulaOption> FormulaOptions => Set<FormulaOption>();
     public DbSet<ProjectAttachment> ProjectAttachments => Set<ProjectAttachment>();
     public DbSet<Customer> Customers => Set<Customer>();

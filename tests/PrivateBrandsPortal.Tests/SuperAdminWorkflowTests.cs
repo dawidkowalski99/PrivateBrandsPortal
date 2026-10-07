@@ -58,7 +58,7 @@ public sealed class SuperAdminWorkflowTests
         await CommercialWorkflowTests.SupplyDocuments(s,id);
         var change = (await commercial.FormAsync(id, details.Products[0].Id, default))!.Input;
         change.Status = CommercialStatus.SalesAndDelivery;
-        await commercial.UpdateAsync(change);
+        await CommercialWorkflowTests.Status(s,id,0,CommercialStatus.SalesAndDelivery);
         await CommercialWorkflowTests.Status(s,id,1,CommercialStatus.SalesAndDelivery);
         Assert.Contains(await commercial.ArchiveAsync(default), x => x.Id == id);
         Assert.Equal(ProjectStatus.Approved, (await s.Projects.DetailsAsync(id))!.Status);

@@ -1040,3 +1040,41 @@ Nie awansuje istniejącego profilu, nie wykorzystuje DemoAccess i nie działa au
 przy starcie. Na istniejącej bazie użyj Administration. Kontrola dostępu do uruchomienia
 polecenia i konfiguracji SQL należy do administratora serwera. Dalszych użytkowników
 należy dodawać przez UI. Nie wykonano bootstrapu ani wdrożenia na produkcji.
+
+## Implementation approval and project closure
+
+Migration: 20261007112812_ImplementationApprovalAndProjectClosure.
+Apply with the existing EF migration workflow. It adds ImplementationApprovals,
+CustomerRejectionReasons and nullable project closure metadata; it does not rewrite
+historical deliveries or copy DEV projects. Four initial customer rejection reasons
+are inserted once by this migration and remain editable afterwards.
+
+An accepted SKU needs an active project Offer and a Calculation assigned either to
+the project or to that exact SKU before entering Implementation into Production.
+Entry creates a Pending implementation approval. Approvals → Implementation Approvals
+is available to active Managers and SuperAdmins. The current project owner cannot
+approve their own implementation, including a SuperAdmin owner. This decision is
+separate from the initial product review and never uses Development demo access.
+
+Rejection requires a comment and leaves the SKU in Implementation. The owner can
+replace documents and resubmit, creating another attempt while preserving history.
+Sales & Delivery requires the latest attempt to be Approved and revalidates active
+documents in the same transaction. Parent project version checks serialize concurrent
+workflow actions. Existing archived deliveries are unaffected.
+
+Project not approved by Customer is an explicitly confirmed, owner-only project
+closure. An active dictionary reason is required; its name, comment, actor and UTC
+timestamp are saved as historical metadata. Accepted unfinished SKUs are closed;
+delivered SKUs and original reviews are preserved. The project becomes Cancelled
+and archived. Archive distinguishes completed delivery from customer rejection.
+Reports and CSV include implementation approval and customer rejection reason.
+
+Only active Managers and SuperAdmins may permanently delete unused dictionary
+values. Manage dictionaries permission alone is insufficient. A confirmation page,
+antiforgery POST, serializable transaction, reference/history checks and non-cascading
+foreign keys protect used values. Used entries must be deactivated instead.
+Dictionary deletions, implementation requests/decisions/resubmissions and customer
+closure have audit entries.
+
+Successful delivery and customer closure use single-use TempData UI feedback.
+Effects do not block interaction and respect prefers-reduced-motion.

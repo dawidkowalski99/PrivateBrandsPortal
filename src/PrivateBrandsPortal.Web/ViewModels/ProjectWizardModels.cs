@@ -86,6 +86,7 @@ public sealed class ProjectListItemViewModel
 }
 public sealed class ProjectDetailsViewModel
 {
+    public string? CustomerRejectionReason {get;set;} public string? CustomerRejectionComment {get;set;} public string? CustomerRejectedBy {get;set;} public DateTimeOffset? CustomerRejectedAtUtc {get;set;}
     public bool RequiresManagerApproval {get;set;} = true;
     public int ProjectManagerId {get;set;}
     public List<ProjectTransferHistory> Transfers { get; set; } = [];
@@ -104,6 +105,7 @@ public sealed class ProjectDetailsViewModel
 public sealed record ProductCardViewModel(string ProductType, string SKU, int Quantity,
     decimal EstimatedValue, decimal EstimatedMargin, FormulaStatus FormulaStatus)
 {
+    public List<ImplementationHistory> ImplementationHistory {get;init;} = [];
     public int? FormulaOptionId { get; init; }
     public string? FormulaName { get; init; }
     public int Id { get; init; }

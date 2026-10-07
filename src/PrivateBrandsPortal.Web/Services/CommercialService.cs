@@ -19,7 +19,7 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
     {
         var owner = await Owner(ct);
         return await db.ProjectProducts.AsNoTracking().Where(p => p.Id == productId && p.ProjectId == projectId && p.Project.ProjectManagerId == owner &&
-            (p.ReviewStatus == ProductReviewStatus.Approved || p.ReviewStatus == ProductReviewStatus.EditedAndApproved) && p.CommercialStatus != CommercialStatus.SalesAndDelivery)
+            p.Project.ArchivedAtUtc==null && (p.ReviewStatus == ProductReviewStatus.Approved || p.ReviewStatus == ProductReviewStatus.EditedAndApproved) && p.CommercialStatus != CommercialStatus.SalesAndDelivery)
             .Select(p => new CommercialForm { ProjectNumber=p.Project.ProjectNumber, SKU=p.SKU, Input=new CommercialInput {
                 ProjectId=projectId, ProductId=productId, Version=p.Project.UpdatedAtUtc, Status=p.CommercialStatus } }).SingleOrDefaultAsync(ct);
     }
@@ -37,8 +37,20 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
         await db.Entry(product).ReloadAsync(ct);
         if(product.ReviewStatus is not (ProductReviewStatus.Approved or ProductReviewStatus.EditedAndApproved) || product.CommercialStatus==CommercialStatus.SalesAndDelivery)
             throw new ValidationException("Only accepted, unfinished products can be updated.");
-        if(input.Status==CommercialStatus.SalesAndDelivery) await AttachmentService.RequireSalesDocumentsAsync(db,input.ProjectId,input.ProductId,ct);
+        if(input.Status==CommercialStatus.CustomerNotApproved)throw new ValidationException("Use Close project to record the customer rejection reason and confirm closure.");
+        if(input.Status==CommercialStatus.SalesAndDelivery) {
+            await AttachmentService.RequireSalesDocumentsAsync(db,input.ProjectId,input.ProductId,ct);
+            var approval=await db.ImplementationApprovals.Where(x=>x.ProjectProductId==product.Id).OrderByDescending(x=>x.Id).Select(x=>(ImplementationApprovalStatus?)x.Status).FirstOrDefaultAsync(ct);
+            if(product.CommercialStatus!=CommercialStatus.ImplementationIntoProduction || approval!=ImplementationApprovalStatus.Approved)
+                throw new ValidationException("Approved Implementation Approval is required before Sales & Delivery.");
+        }
+        if(product.CommercialStatus==CommercialStatus.ImplementationIntoProduction && input.Status is not (CommercialStatus.ImplementationIntoProduction or CommercialStatus.SalesAndDelivery))
+            throw new ValidationException("Complete Implementation Approval or close the project as not approved by Customer.");
         if(product.CommercialStatus==input.Status) { await tx.RollbackAsync(ct); return; }
+        if(input.Status==CommercialStatus.ImplementationIntoProduction) {
+            await AttachmentService.RequireSalesDocumentsAsync(db,input.ProjectId,input.ProductId,ct,"Implementation into Production");
+            ImplementationService.Request(db,product.Id,owner,now,false);
+        }
         db.AuditLogs.Add(new AuditLog { EntityType=nameof(ProjectProduct),EntityId=product.Id,FieldName=nameof(ProjectProduct.CommercialStatus),
             OldValue=product.CommercialStatus?.ToString(),NewValue=input.Status!.Value.ToString(),ChangedByUserId=owner,ChangedAtUtc=now,ChangeType=AuditChangeType.Updated });
         product.CommercialStatus=input.Status; product.UpdatedAtUtc=now;
@@ -58,6 +70,6 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
         var global=(await users.GetCurrentAsync(ct)).Role==AppRole.SuperAdmin;
         return await db.Projects.AsNoTracking().Where(p=>(global || p.ProjectManagerId==owner) && p.ArchivedAtUtc!=null).Search(search).OrderByDescending(p=>p.ArchivedAtUtc)
             .Select(p=>new ArchiveItem(p.Id,p.ProjectNumber,p.Customer,p.Country.Name,p.ProjectManager.DisplayName,p.Products.Count,
-                p.Products.Count(x=>x.CommercialStatus==CommercialStatus.SalesAndDelivery),p.ArchivedAtUtc)).ToListAsync(ct);
+                p.Products.Count(x=>x.CommercialStatus==CommercialStatus.SalesAndDelivery),p.ArchivedAtUtc,p.CustomerRejectionReasonName)).ToListAsync(ct);
     }
 }

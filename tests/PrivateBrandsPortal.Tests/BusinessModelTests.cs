@@ -21,9 +21,9 @@ public sealed class BusinessModelTests
     public void Model_contains_eleven_entities_and_no_cascade_deletes()
     {
         using var db = CreateContext();
-        Assert.Equal(15, db.Model.GetEntityTypes().Count());
+        Assert.Equal(17, db.Model.GetEntityTypes().Count());
         var foreignKeys = db.Model.GetEntityTypes().SelectMany(x => x.GetForeignKeys()).ToList();
-        Assert.Equal(21, foreignKeys.Count);
+        Assert.Equal(26, foreignKeys.Count);
         Assert.All(foreignKeys, fk => Assert.Equal(DeleteBehavior.NoAction, fk.DeleteBehavior));
     }
 

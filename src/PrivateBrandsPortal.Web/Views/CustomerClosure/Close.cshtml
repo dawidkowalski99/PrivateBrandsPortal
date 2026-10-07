@@ -1,0 +1,9 @@
+@model CustomerClosureModel
+@{ViewData["Title"]="Close project";}
+<div class="page-heading"><div><p class="eyebrow">@Model.ProjectNumber</p><h1>Project not approved by Customer</h1></div></div>
+<form method="post" class="panel form-panel"><div asp-validation-summary="All" class="validation-summary"></div><input asp-for="Input.ProjectId" type="hidden"/><input type="hidden" name="Input.Version" value="@Model.Input.Version?.ToString("O")"/>
+<p class="alert alert-warning">This will close the entire project and move it to Archive. All unfinished commercial products will be closed; history and documents will be preserved.</p>
+<div class="field"><label asp-for="Input.ReasonId"></label><select asp-for="Input.ReasonId" class="form-select" required><option value="">Select reason</option>@foreach(var reason in Model.Reasons){<option value="@reason.Id">@reason.Name</option>}</select><span asp-validation-for="Input.ReasonId"></span></div>
+<div class="field"><label asp-for="Input.Comment"></label><textarea asp-for="Input.Comment" class="form-control" maxlength="1000"></textarea></div>
+<label class="mt-3"><input asp-for="Input.Confirm" required/> I confirm closing the entire project.</label>
+<div class="form-actions"><a asp-controller="Projects" asp-action="Details" asp-route-id="@Model.Input.ProjectId" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-outline-danger">Close project</button></div></form>

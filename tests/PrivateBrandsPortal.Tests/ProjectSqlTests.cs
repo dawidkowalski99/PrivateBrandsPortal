@@ -67,15 +67,17 @@ public sealed class ProjectSqlTests
         public async ValueTask DisposeAsync()
         {
             await using var clean = NewContext();
-            var ids = clean.AppUsers.Where(x => x.DomainLogin == Login).Select(x => x.Id);
+            var ids = clean.AppUsers.Where(x => x.DomainLogin.StartsWith(Login)).Select(x => x.Id);
             var projectIds=clean.Projects.Where(x=>ids.Contains(x.ProjectManagerId) || (x.CreatedByUserId.HasValue && ids.Contains(x.CreatedByUserId.Value))).Select(x=>x.Id);
             await clean.ProjectAttachments.Where(x=>projectIds.Contains(x.ProjectId) || ids.Contains(x.UploadedByUserId)).ExecuteDeleteAsync();
             await clean.AuditLogs.Where(x => ids.Contains(x.ChangedByUserId) || (x.EntityType=="Project" && projectIds.Contains(x.EntityId)) || (x.EntityType=="ProjectProduct" && clean.ProjectProducts.Any(p=>p.Id==x.EntityId && projectIds.Contains(p.ProjectId)))).ExecuteDeleteAsync();
+            await clean.ImplementationApprovals.Where(x=>ids.Contains(x.RequestedByUserId) || (x.ReviewerId.HasValue && ids.Contains(x.ReviewerId.Value)) || projectIds.Contains(x.ProjectProduct.ProjectId)).ExecuteDeleteAsync();
             await clean.ProductReviews.Where(x => ids.Contains(x.ReviewerId) || projectIds.Contains(x.ProjectProduct.ProjectId)).ExecuteDeleteAsync();
             await clean.ProjectProducts.Where(x => projectIds.Contains(x.ProjectId)).ExecuteDeleteAsync();
             await clean.Projects.Where(x => projectIds.Contains(x.Id)).ExecuteDeleteAsync();
             await clean.AppUserPermissions.Where(x => ids.Contains(x.AppUserId)).ExecuteDeleteAsync();
-            await clean.AppUsers.Where(x => x.DomainLogin == Login).ExecuteDeleteAsync();
+            await clean.AppUsers.Where(x => x.DomainLogin.StartsWith(Login)).ExecuteDeleteAsync();
+            await clean.CustomerRejectionReasons.Where(x=>x.Name.StartsWith(Login)).ExecuteDeleteAsync();
             await clean.RejectionReasons.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();
             await clean.ProductSubcategories.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();
             await clean.Customers.Where(x => x.Name.StartsWith(Login)).ExecuteDeleteAsync();

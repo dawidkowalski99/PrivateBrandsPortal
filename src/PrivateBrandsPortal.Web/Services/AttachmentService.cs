@@ -187,7 +187,11 @@ public sealed class AttachmentService(ApplicationDbContext db, IAppUserService u
     {
         var actor=await users.GetCurrentAsync(ct);
         var file=await db.ProjectAttachments.AsNoTracking().Include(x=>x.Project).SingleOrDefaultAsync(x=>x.Id==id && x.DeletedAtUtc==null,ct);
-        if(file is null || !(CanWrite(file.Project,actor) || (file.AttachmentType==AttachmentType.Brief && CanReviewBrief(file.Project,actor))))
+        var implementationDocument=file is not null && actor.IsActive && actor.Role==AppRole.Manager &&
+            file.Project.ArchivedAtUtc==null && file.AttachmentType is AttachmentType.Offer or AttachmentType.Calculation &&
+            await db.ProjectProducts.AnyAsync(p=>p.ProjectId==file.ProjectId && p.CommercialStatus==CommercialStatus.ImplementationIntoProduction &&
+                p.ImplementationApprovals.Any() && (file.ProjectProductId==null || file.AttachmentType==AttachmentType.Calculation && file.ProjectProductId==p.Id),ct);
+        if(file is null || !(CanWrite(file.Project,actor) || implementationDocument || (file.AttachmentType==AttachmentType.Brief && CanReviewBrief(file.Project,actor))))
             throw new PortalAccessException();
         return (await Storage(()=>storage.OpenAsync(file.StorageKey,ct)),file.ContentType,file.OriginalFileName);
     }
@@ -206,22 +210,22 @@ public sealed class AttachmentService(ApplicationDbContext db, IAppUserService u
                 x.ProjectProduct==null || x.ProjectProduct.ProductCategory==null ? null : x.ProjectProduct.ProductCategory.Name,
                 x.ProjectProduct==null ? null : x.ProjectProduct.Subcategory,
                 x.ProjectProduct==null || x.ProjectProduct.ProductType==null ? null : x.ProjectProduct.ProductType.Name)).ToListAsync(ct);
-        var requirements=owner ? await db.ProjectProducts.AsNoTracking().Where(x=>x.ProjectId==id && x.CommercialStatus==CommercialStatus.ImplementationIntoProduction)
+        var requirements=owner ? await db.ProjectProducts.AsNoTracking().Where(x=>x.ProjectId==id && x.Project.ArchivedAtUtc==null && (x.ReviewStatus==ProductReviewStatus.Approved || x.ReviewStatus==ProductReviewStatus.EditedAndApproved) && x.CommercialStatus!=CommercialStatus.SalesAndDelivery)
             .Select(x=>new AttachmentRequirement(x.Id,x.SKU,
                 db.ProjectAttachments.Any(a=>a.ProjectId==id && a.DeletedAtUtc==null && a.AttachmentType==AttachmentType.Offer && a.ProjectProductId==null),
                 db.ProjectAttachments.Any(a=>a.ProjectId==id && a.DeletedAtUtc==null && a.AttachmentType==AttachmentType.Calculation && (a.ProjectProductId==null || a.ProjectProductId==x.Id))))
             .ToListAsync(ct) : [];
         return new(id,owner && project.ArchivedAtUtc==null,items,requirements);
     }
-    public static async Task RequireSalesDocumentsAsync(ApplicationDbContext db,int projectId,int productId,CancellationToken ct)
+    public static async Task RequireSalesDocumentsAsync(ApplicationDbContext db,int projectId,int productId,CancellationToken ct,string stage="Sales & Delivery")
     {
         var documents=await db.ProjectAttachments.AsNoTracking().Where(x=>x.ProjectId==projectId && x.DeletedAtUtc==null)
             .Select(x=>new{x.AttachmentType,x.ProjectProductId}).ToListAsync(ct);
         var errors=new List<string>();
         if(!documents.Any(x=>x.AttachmentType==AttachmentType.Offer && x.ProjectProductId==null))
-            errors.Add("An offer attachment is required before Sales & Delivery.");
+            errors.Add($"An offer attachment is required before {stage}.");
         if(!documents.Any(x=>x.AttachmentType==AttachmentType.Calculation && (x.ProjectProductId==null || x.ProjectProductId==productId)))
-            errors.Add("A calculation attachment is required before Sales & Delivery.");
-        if(errors.Count>0)throw new ValidationException(string.Join("\n",errors));
+            errors.Add($"A calculation attachment is required before {stage}.");
+        if(errors.Count>0)throw new ValidationException(string.Join(Environment.NewLine,errors));
     }
 }

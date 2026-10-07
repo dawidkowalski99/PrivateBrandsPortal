@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 namespace PrivateBrandsPortal.Web.ViewModels;
-public enum DictionaryKind { ProductCategories=1, RejectionReasons=2, Countries=3, Customers=4, ProductSubcategories=5, FormulaOptions=6 }
+public enum DictionaryKind { ProductCategories=1, RejectionReasons=2, Countries=3, Customers=4, ProductSubcategories=5, FormulaOptions=6, CustomerRejectionReasons=7 }
 public sealed class DictionaryInput : IValidatableObject
 {
     public int Id {get;set;}
@@ -17,8 +17,8 @@ public sealed class DictionaryInput : IValidatableObject
             yield return new("Use a two-letter country code.", [nameof(Code)]);
         if(Kind==DictionaryKind.ProductSubcategories && ProductCategoryId is null)
             yield return new("Select a product category.", [nameof(ProductCategoryId)]);
-        if(Kind==DictionaryKind.FormulaOptions && (Code is null || !System.Text.RegularExpressions.Regex.IsMatch(Code, "^[A-Z][A-Z0-9_]{0,63}$"))) yield return new("Use a stable uppercase code with letters, digits and underscores.", [nameof(Code)]);
-        if(Kind is not (DictionaryKind.Customers or DictionaryKind.FormulaOptions) && Name.Length>100) yield return new("Use at most 100 characters.", [nameof(Name)]);
+        if(Kind is DictionaryKind.FormulaOptions or DictionaryKind.CustomerRejectionReasons && (Code is null || !System.Text.RegularExpressions.Regex.IsMatch(Code, "^[A-Z][A-Z0-9_]{0,63}$"))) yield return new("Use a stable uppercase code with letters, digits and underscores.", [nameof(Code)]);
+        if(Kind is not (DictionaryKind.Customers or DictionaryKind.FormulaOptions or DictionaryKind.CustomerRejectionReasons) && Name.Length>100) yield return new("Use at most 100 characters.", [nameof(Name)]);
     }
     [EnumDataType(typeof(DictionaryKind))] public DictionaryKind Kind {get;set;}
     [Required,StringLength(200)] public string Name {get;set;}="";

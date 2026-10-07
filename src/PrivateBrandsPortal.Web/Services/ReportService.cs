@@ -33,7 +33,7 @@ public sealed class ReportService(ApplicationDbContext db,IPermissionService per
         ProjectNumber=x.Project.ProjectNumber,ProjectManager=x.Project.ProjectManager.DisplayName,Customer=x.Project.Customer,Country=x.Project.Country.Name,ProjectStatus=x.Project.Status,
         Category=x.ProductCategory==null?null:x.ProductCategory.Name,Subcategory=x.Subcategory ?? EF.Functions.Collate(x.ProductType!.Name,"Latin1_General_100_CI_AS"),SKU=x.SKU,Quantity=x.Quantity,EstimatedValue=x.EstimatedValue,EstimatedMargin=x.EstimatedMargin,
         Formula=x.FormulaOption!=null?x.FormulaOption.Name:x.FormulaStatus==FormulaStatus.ReadyToGo?"Ready to go":"New formula", ReviewStatus=x.ReviewStatus,RejectionReason=x.Reviews.Where(r=>r.Decision==ReviewDecision.Rejected).OrderByDescending(r=>r.ReviewedAtUtc).ThenByDescending(r=>r.Id).Select(r=>r.RejectionReasonName ?? (r.RejectionReason==null?r.Comment:EF.Functions.Collate(r.RejectionReason.Name,"Latin1_General_100_CI_AS"))).FirstOrDefault(),
-        CommercialStatus=x.CommercialStatus,CreatedAtUtc=x.Project.CreatedAtUtc,ArchivedAtUtc=x.Project.ArchivedAtUtc});
+        ImplementationStatus=x.ImplementationApprovals.OrderByDescending(a=>a.Id).Select(a=>(ImplementationApprovalStatus?)a.Status).FirstOrDefault(),CustomerRejectionReason=x.Project.CustomerRejectionReasonName,CommercialStatus=x.CommercialStatus,CreatedAtUtc=x.Project.CreatedAtUtc,ArchivedAtUtc=x.Project.ArchivedAtUtc});
     public async Task<ReportPage> GetAsync(ReportFilter f,CancellationToken ct=default)
     {
         await Authorize(ct);var user=await users.GetCurrentAsync(ct);var q=Filter(f,user);
