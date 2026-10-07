@@ -30,6 +30,7 @@ builder.Services.AddScoped<CommercialService>();
 builder.Services.AddScoped<DictionaryService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<UserAdministrationService>();
+builder.Services.AddScoped<SuperAdminBootstrap>();
 builder.Services.AddScoped<ProductCopyService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ProjectTransferService>();
@@ -52,6 +53,20 @@ builder.Services.AddScoped<IProjectNumberGenerator, ProjectNumberGenerator>();
 builder.Services.AddExceptionHandler<PortalExceptionHandler>();
 
 var app = builder.Build();
+if(args.Contains("--bootstrap-superadmin",StringComparer.Ordinal))
+{
+    using var scope=app.Services.CreateScope();
+    var login=builder.Configuration["bootstrap-superadmin"] ?? "";
+    var name=builder.Configuration["display-name"] ?? "";
+    try {
+        var id=await scope.ServiceProvider.GetRequiredService<SuperAdminBootstrap>().RunAsync(login,name);
+        app.Logger.LogInformation("First SuperAdmin created: {UserId}.",id);
+    }
+    catch(System.ComponentModel.DataAnnotations.ValidationException ex) {
+        app.Logger.LogError("Bootstrap rejected: {Reason}",ex.Message);Environment.ExitCode=1;
+    }
+    await app.DisposeAsync();return;
+}
 if (args.Contains("--cleanup-temp-attachments", StringComparer.Ordinal))
 {
     var storage = app.Services.GetRequiredService<IFileStorage>();
@@ -71,6 +86,7 @@ app.UseStaticFiles();
 app.UseRequestLocalization();
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<PortalAllowListMiddleware>();
 app.UseAuthorization();
 app.MapControllerRoute("default", "{controller=Dashboard}/{action=Index}/{id?}");
 app.Run();

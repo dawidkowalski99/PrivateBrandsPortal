@@ -9,6 +9,20 @@ namespace PrivateBrandsPortal.Web.Controllers;
 [Authorize(Policy = PermissionCodes.ManageUsers), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class UsersController(UserAdministrationService service) : Controller
 {
+    [HttpGet]
+    public async Task<IActionResult> Create(CancellationToken ct) => View(await service.CreateFormAsync(ct));
+    [HttpPost]
+    public async Task<IActionResult> Create([Bind(Prefix="Input")] UserCreateInput input,CancellationToken ct)
+    {
+        input.DomainLogin=input.DomainLogin?.Trim() ?? "";input.DisplayName=input.DisplayName?.Trim() ?? "";
+        ModelState.Remove("Input.DomainLogin");ModelState.Remove("Input.DisplayName");TryValidateModel(input,"Input");
+        try {
+            if(ModelState.IsValid) {var id=await service.CreateAsync(input,ct);TempData["Success"]="User created.";return RedirectToAction(nameof(Edit),new{id});}
+        }
+        catch(PortalAccessException){return Forbid();}
+        catch(ValidationException ex){ModelState.AddModelError("",ex.Message);}
+        var page=await service.CreateFormAsync(ct);page.Input=input;return View(page);
+    }
     public async Task<IActionResult> Index(string? search, CancellationToken ct)
     {
         if (search?.Length > 200) return BadRequest();

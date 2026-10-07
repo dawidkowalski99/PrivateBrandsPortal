@@ -20,7 +20,7 @@ public sealed class FileStorage(IOptions<FileStorageOptions> options, ILogger<Fi
     private string Resolve(string key)
     {
         // Only server-generated keys are accepted, even by internal callers.
-        if (!Regex.IsMatch(key, @"\A(?:projects/[1-9][0-9]*|temp/[1-9][0-9]*/[a-f0-9]{32})/[a-f0-9]{32}\.(xlsx|xlsm|xls)\z"))
+        if (!Regex.IsMatch(key, @"\A(?:projects/[1-9][0-9]*|temp/[1-9][0-9]*/[a-f0-9]{32})/[a-f0-9]{32}\.(xlsx|xlsm|xls|pdf|txt|doc|docx)\z"))
             throw new ValidationException("Invalid attachment reference.");
         var root = Root();
         var path = Path.GetFullPath(Path.Combine(root, key.Replace('/', Path.DirectorySeparatorChar)));

@@ -26,13 +26,13 @@ public sealed class AttachmentService(ApplicationDbContext db, IAppUserService u
         name = new string(name.Where(c => !char.IsControl(c)).ToArray());
         var extension = Path.GetExtension(name).ToLowerInvariant();
         if (name.Length is 0 or > 255 || !options.Value.AllowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)
-            || extension is not (".xlsx" or ".xlsm" or ".xls"))
-            throw new ValidationException("Choose an Excel attachment (.xlsx, .xlsm or .xls).");
+            || extension is not (".xlsx" or ".xlsm" or ".xls" or ".pdf" or ".txt" or ".doc" or ".docx"))
+            throw new ValidationException("Choose an attachment (.xlsx, .xlsm, .xls, .pdf, .txt, .doc or .docx).");
         if (options.Value.MaxBytes <= 0 || file.Length <= 0 || file.Length > options.Value.MaxBytes)
             throw new ValidationException($"Choose a non-empty attachment up to {options.Value.MaxFileSizeMb} MB.");
         var contentType = extension switch {
             ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".xlsm" => "application/vnd.ms-excel.sheet.macroEnabled.12", _ => "application/vnd.ms-excel" };
+            ".xlsm" => "application/vnd.ms-excel.sheet.macroEnabled.12", ".pdf" => "application/pdf", ".txt" => "text/plain", ".doc" => "application/msword", ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document", _ => "application/vnd.ms-excel" };
         return (name, extension, contentType);
     }
     private async Task<T> Storage<T>(Func<Task<T>> action)
@@ -110,8 +110,12 @@ public sealed class AttachmentService(ApplicationDbContext db, IAppUserService u
         var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==input.ProjectId,ct);
         if (project is null || !CanWrite(project,actor)) throw new PortalAccessException();
         if (project.ArchivedAtUtc.HasValue) throw new ValidationException("Archived project attachments are read-only.");
-        var products = await db.ProjectProducts.AsNoTracking().Where(x=>x.ProjectId==input.ProjectId)
-            .OrderBy(x=>x.SKU).Select(x=>new LookupItem(x.Id,x.SKU)).ToListAsync(ct);
+        var rows = await db.ProjectProducts.AsNoTracking().Where(x=>x.ProjectId==input.ProjectId)
+            .OrderBy(x=>x.SKU).Select(x=>new { x.Id, Category = x.ProductCategory == null ? null : x.ProductCategory.Name,
+                x.Subcategory, LegacyType = x.ProductType == null ? null : x.ProductType.Name }).ToListAsync(ct);
+        // Format in memory: historical and dictionary columns can have different SQL collations.
+        var products = rows.Select(x=>new LookupItem(x.Id,
+            (x.Category ?? "Legacy category") + " — " + (x.Subcategory ?? x.LegacyType ?? "Legacy product"))).ToList();
         return new(input,products);
     }
     public async Task UploadAsync(AttachmentInput input, CancellationToken ct)
@@ -145,6 +149,40 @@ public sealed class AttachmentService(ApplicationDbContext db, IAppUserService u
         }
         catch { if(saved) await CleanupFilesAsync([key]); throw; }
     }
+    public async Task<AttachmentRemovalModel> RemovalFormAsync(int id, CancellationToken ct)
+    {
+        var actor=await users.GetCurrentAsync(ct);
+        var file=await db.ProjectAttachments.AsNoTracking().Include(x=>x.Project)
+            .SingleOrDefaultAsync(x=>x.Id==id && x.DeletedAtUtc==null,ct);
+        if(file is null || !CanWrite(file.Project,actor))throw new PortalAccessException();
+        if(file.Project.ArchivedAtUtc.HasValue)throw new ValidationException("Archived project attachments are read-only.");
+        return new(file.Id,file.ProjectId,file.OriginalFileName);
+    }
+    public async Task<int> RemoveAsync(int id,CancellationToken ct)
+    {
+        var actor=await users.GetCurrentAsync(ct);
+        var form=await RemovalFormAsync(id,ct);
+        await using var tx=await db.Database.BeginTransactionAsync(ct);
+        var now=clock.GetUtcNow();
+        var locked=await db.Projects.Where(x=>x.Id==form.ProjectId && x.ArchivedAtUtc==null &&
+            (x.ProjectManagerId==actor.Id || actor.Role==AppRole.SuperAdmin))
+            .ExecuteUpdateAsync(s=>s.SetProperty(x=>x.UpdatedAtUtc,x=>x.UpdatedAtUtc < now ? now : x.UpdatedAtUtc.AddMilliseconds(1)),ct);
+        if(locked!=1)throw new PortalAccessException();
+        var file=await db.ProjectAttachments.SingleOrDefaultAsync(x=>x.Id==id && x.DeletedAtUtc==null,ct);
+        if(file is null)throw new ValidationException("This attachment has already been removed.");
+        file.DeletedAtUtc=now;file.DeletedByUserId=actor.Id;
+        await db.SaveChangesAsync(ct);
+        var delivered=await db.ProjectProducts.Where(x=>x.ProjectId==form.ProjectId && x.CommercialStatus==CommercialStatus.SalesAndDelivery)
+            .Select(x=>x.Id).ToListAsync(ct);
+        foreach(var productId in delivered)
+            try { await RequireSalesDocumentsAsync(db,form.ProjectId,productId,ct); }
+            catch(ValidationException) { throw new ValidationException("This document is required by a delivered product. Upload a replacement before removing it."); }
+        db.AuditLogs.Add(new AuditLog { EntityType=nameof(Project),EntityId=form.ProjectId,FieldName="Attachment",
+            OldValue=System.Text.Json.JsonSerializer.Serialize(new { AttachmentId=file.Id,Type=file.AttachmentType.ToString(),FileName=file.OriginalFileName,ProjectProductId=file.ProjectProductId }),
+            ChangedByUserId=actor.Id,ChangedAtUtc=now,ChangeType=AuditChangeType.AttachmentRemoved });
+        await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+        return form.ProjectId;
+    }
     public async Task<(Stream Stream,string ContentType,string Name)> DownloadAsync(int id,CancellationToken ct)
     {
         var actor=await users.GetCurrentAsync(ct);
@@ -164,7 +202,10 @@ public sealed class AttachmentService(ApplicationDbContext db, IAppUserService u
         if(!owner)query=query.Where(x=>x.AttachmentType==AttachmentType.Brief);
         var items=await query.OrderBy(x=>x.AttachmentType).ThenByDescending(x=>x.UploadedAtUtc)
             .Select(x=>new AttachmentItem(x.Id,x.AttachmentType,x.OriginalFileName,x.FileSize,x.UploadedByUser.DisplayName,x.UploadedAtUtc,
-                x.ProjectProduct==null?null:x.ProjectProduct.SKU,x.Description)).ToListAsync(ct);
+                x.ProjectProduct==null?null:x.ProjectProduct.SKU,x.Description,
+                x.ProjectProduct==null || x.ProjectProduct.ProductCategory==null ? null : x.ProjectProduct.ProductCategory.Name,
+                x.ProjectProduct==null ? null : x.ProjectProduct.Subcategory,
+                x.ProjectProduct==null || x.ProjectProduct.ProductType==null ? null : x.ProjectProduct.ProductType.Name)).ToListAsync(ct);
         var requirements=owner ? await db.ProjectProducts.AsNoTracking().Where(x=>x.ProjectId==id && x.CommercialStatus==CommercialStatus.ImplementationIntoProduction)
             .Select(x=>new AttachmentRequirement(x.Id,x.SKU,
                 db.ProjectAttachments.Any(a=>a.ProjectId==id && a.DeletedAtUtc==null && a.AttachmentType==AttachmentType.Offer && a.ProjectProductId==null),

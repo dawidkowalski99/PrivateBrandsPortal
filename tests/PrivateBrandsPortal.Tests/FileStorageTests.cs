@@ -11,9 +11,9 @@ public sealed class FileStorageTests : IDisposable
     internal FileStorage Storage {get;}
     public FileStorageTests(){Directory.CreateDirectory(root);Storage=new(Options.Create(new FileStorageOptions{RootPath=root}),NullLogger<FileStorage>.Instance);}
     private static string Key()=> $"projects/1/{Guid.NewGuid():N}.xlsx";
-    [Fact] public async Task Roundtrip_preserves_bytes_hash_and_prevents_overwrite()
+    [Theory][InlineData(".xlsx")][InlineData(".pdf")][InlineData(".txt")][InlineData(".doc")][InlineData(".docx")] public async Task Roundtrip_preserves_bytes_hash_and_prevents_overwrite(string extension)
     {
-        var key=Key();byte[] bytes=[0,255,3,10,99];
+        var key=$"projects/1/{Guid.NewGuid():N}{extension}";byte[] bytes=[0,255,3,10,99];
         var stored=await Storage.SaveAsync(key,new MemoryStream(bytes),10,default);
         Assert.Equal(bytes.Length,stored.Size);Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)),stored.Sha256);
         await Assert.ThrowsAsync<IOException>(()=>Storage.SaveAsync(key,new MemoryStream([1]),10,default));

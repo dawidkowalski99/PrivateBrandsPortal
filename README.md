@@ -933,7 +933,7 @@ PROD należy skonfigurować oddzielnie jako `PrivateBrandsPortal\Attachments_PRO
 zatwierdzonym udziale. Nie kopiować dokumentów testowych DEV do PROD.
 Żaden rzeczywisty adres środowiska ani hasło nie jest potrzebne w appsettings repozytorium.
 
-`FileStorage:MaxFileSizeMb` ma domyślnie 25, `AllowedExtensions`: .xlsx, .xlsm, .xls.
+`FileStorage:MaxFileSizeMb` ma domyślnie 25, `AllowedExtensions`: .xlsx, .xlsm, .xls, .pdf, .txt, .doc, .docx.
 Limit sprawdzany jest zarówno na deklarowanej długości, jak i podczas czytania strumienia.
 Pliki są przechowywane jako nieinterpretowane bajty; portal nie otwiera Excela i nie wykonuje makr.
 Typ pobieranej zawartości wynika z rozszerzenia, nie z MIME dostarczonego przez przeglądarkę.
@@ -947,7 +947,7 @@ na to pozwalać. Użytkownicy portalu nie potrzebują bezpośredniego dostępu S
 w wwwroot ani SQL. URL pobrania zawiera wyłącznie ID załącznika; kontroler sprawdza aktualnego
 właściciela, rolę i etap. Manager cudzy projekt: tylko Brief na etapie review. Owner i SuperAdmin:
 dokumenty projektu, również po Archive. Upload: owner lub SuperAdmin, przed archiwizacją.
-Nie dodano operacji usuwania; pola soft delete przygotowano, a oznaczone rekordy są ignorowane.
+Usuwanie wymaga potwierdzenia i praw ownera/SuperAdmin; zapisuje soft delete i audit, zachowując plik fizyczny. Archiwum jest tylko do odczytu. Dokumentu wymaganego przez dostarczony SKU nie można usunąć bez zastępstwa.
 
 StorageKey jest generowany przez serwer (GUID), walidowany i rozwiązywany pod root.
 Nie używa OriginalFileName jako ścieżki. Nazwa do wyświetlenia jest oczyszczana; Razor ją koduje.
@@ -999,3 +999,44 @@ CreatedByUserId jest niezmiennym autorem, ProjectManagerId bieżącym właścici
 Dawne projekty zachowują RequiresManagerApproval=true, a nieznany historyczny autor pozostaje NULL.
 Transfer do aktywnego PM/Manager/SuperAdmin nie zmienia autora ani trybu zatwierdzania,
 nie kopiuje plików i nie zmienia UploadedBy. Raporty nadal agregują według bieżącego ownera.
+
+## Allow-list użytkowników i Add User
+
+Administration → Users → + Add User dodaje wyłącznie profil AppUser dla istniejącego
+konta Windows (format DOMAIN\username). Portal nie tworzy kont AD i nie zbiera haseł.
+SuperAdmin lub aktywny użytkownik z MANAGE_USERS może tworzyć PM/Manager; tylko
+SuperAdmin tworzy lub edytuje SuperAdminów. Login po utworzeniu jest read-only.
+Display Name, Role, Active i Permissions można edytować. REASSIGN_PROJECTS nie jest
+uprawnieniem delegowanym. Obowiązuje dotychczasowa ochrona ostatniego aktywnego SuperAdmina.
+
+Login jest trimowany. Istniejący unikalny indeks Latin1_General_100_CI_AS blokuje także
+różnice wielkości liter; konto nieaktywne nadal rezerwuje login. Zduplikowany login
+należy obsłużyć przez edycję istniejącego konta. Zapis profilu, grantów i UserCreated
+(AuditLog.ChangeType=Created) jest transakcyjny. Edycje nazwy, roli, aktywności i grantów
+zapisują stare/nowe wartości wraz z administratorem i czasem UTC.
+
+Production (również Staging) nie tworzy AppUsers podczas wejścia. Windows SSO potwierdza
+tożsamość, ale nie nadaje dostępu. Globalna kontrola przed authorization blokuje konto
+bez AppUser lub nieaktywne statusem HTTP 403 i stroną Access denied zawierającą tylko
+bieżący Windows login. Dotyczy również endpointów załączników. Zachowano dotychczasowy
+mechanizm profili wyłącznie w Development dla lokalnych testów; nigdy nie uruchamiać
+produkcji jako Development. DemoAccess jest ignorowany poza Development; na produkcji
+ustawić DemoAccess:Enabled=false. Izolacja danych PM nie zmienia się.
+
+### Pierwszy SuperAdmin na pustej bazie
+
+Po migracjach, przed uruchomieniem IIS, zaufany operator serwera uruchamia świadomie
+polecenie w katalogu opublikowanej aplikacji, z jej produkcyjną konfiguracją połączenia:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = 'Production'
+dotnet PrivateBrandsPortal.Web.dll --bootstrap-superadmin 'DOMAIN\administrator' --display-name 'Portal administrator'
+```
+
+Podaj rzeczywisty, wcześniej zweryfikowany login administratora. Nie wpisuj haseł.
+Polecenie kończy się bez startu HTTP. Działa tylko przy całkowicie pustej tabeli AppUsers,
+blokuje równoległe operacje administracyjne i zapisuje audyt z przyczyną jawnego bootstrapu.
+Nie awansuje istniejącego profilu, nie wykorzystuje DemoAccess i nie działa automatycznie
+przy starcie. Na istniejącej bazie użyj Administration. Kontrola dostępu do uruchomienia
+polecenia i konfiguracji SQL należy do administratora serwera. Dalszych użytkowników
+należy dodawać przez UI. Nie wykonano bootstrapu ani wdrożenia na produkcji.

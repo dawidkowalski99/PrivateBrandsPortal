@@ -1,0 +1,12 @@
+@model AttachmentRemovalModel
+@{ViewData["Title"]="Remove attachment";}
+<div class="page-heading"><div><p class="eyebrow">PROJECT DOCUMENTS</p><h1>Remove attachment?</h1></div></div>
+<section class="panel form-panel">
+<p>Remove <strong>@Model.FileName</strong> from this project's attachments?</p>
+<p class="text-muted">The file will no longer be available for download or count towards required documents. Its history will be preserved.</p>
+<form method="post" asp-action="Remove" class="form-actions">
+<input type="hidden" name="id" value="@Model.Id"/>
+<a class="btn btn-outline-secondary" asp-action="Details" asp-controller="Projects" asp-route-id="@Model.ProjectId">Cancel</a>
+<button type="submit" class="btn btn-danger">Remove attachment</button>
+</form>
+</section>

@@ -1,10 +1,11 @@
 @model UserEditPage
 @using PrivateBrandsPortal.Web.Models.Enums
 @{ViewData["Title"]="Edit User";}
+@if(TempData["Success"] is string success){<div class="alert alert-success" role="status">@success</div>}
 <div class="page-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>Edit User</h1><p>@Model.DisplayName · @Model.DomainLogin</p></div></div>
 <form method="post" class="panel form-panel"><div asp-validation-summary="All" class="validation-summary" role="alert"></div>
 <input asp-for="Input.Id" type="hidden"/><input name="Input.Version" value="@Model.Input.Version?.ToString("O")" type="hidden"/>
-<div class="field"><label asp-for="Input.Role"></label><select asp-for="Input.Role" class="form-select">
+<div class="field"><label asp-for="Input.DisplayName"></label><input asp-for="Input.DisplayName" class="form-control" required maxlength="200"/><span asp-validation-for="Input.DisplayName"></span></div><div class="field"><label asp-for="Input.Role"></label><select asp-for="Input.Role" class="form-select">
 @foreach(var role in Enum.GetValues<AppRole>().Where(x=>Model.CanAssignSuperAdmin || x!=AppRole.SuperAdmin)){<option value="@role">@EnumLabel.Text(role)</option>}
 </select></div><label class="mt-4"><input asp-for="Input.IsActive"/> Active</label>
 <fieldset class="mt-4"><legend>Permissions</legend><p>SuperAdmin receives all administrative permissions automatically. SuperAdmin can also use both business workflows; project ownership rules still apply.</p>

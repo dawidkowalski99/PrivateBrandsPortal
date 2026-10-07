@@ -1,0 +1,17 @@
+@model UserCreatePage
+@using PrivateBrandsPortal.Web.Models.Enums
+@{ViewData["Title"]="Add User";}
+<div class="page-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>Add User</h1><p>Allow an existing Windows account to use the portal.</p></div></div>
+<form method="post" class="panel form-panel">
+<div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+<div class="form-grid">
+<div class="field"><label asp-for="Input.DomainLogin"></label><input asp-for="Input.DomainLogin" class="form-control" placeholder="DOMAIN\username" maxlength="256" required/><span asp-validation-for="Input.DomainLogin"></span></div>
+<div class="field"><label asp-for="Input.DisplayName"></label><input asp-for="Input.DisplayName" class="form-control" maxlength="200" required/><span asp-validation-for="Input.DisplayName"></span></div>
+<div class="field"><label asp-for="Input.Role"></label><select asp-for="Input.Role" class="form-select" required>
+@foreach(var role in Enum.GetValues<AppRole>().Where(x=>Model.CanAssignSuperAdmin || x!=AppRole.SuperAdmin)){<option value="@role">@EnumLabel.Text(role)</option>}
+</select><span asp-validation-for="Input.Role"></span></div></div>
+<label class="mt-4"><input asp-for="Input.IsActive"/> Active</label>
+<fieldset class="mt-4"><legend>Permissions</legend><p>SuperAdmin has full access regardless of these selections.</p>
+@foreach(var permission in Model.Permissions){<label class="d-block mb-3"><input type="checkbox" name="Input.PermissionIds" value="@permission.Id" checked="@(Model.Input.PermissionIds.Contains(permission.Id))"/> @permission.Name</label>}
+</fieldset><div class="form-actions"><a asp-action="Index" class="btn btn-outline-secondary">Cancel</a><button type="submit" class="btn btn-primary">Add User</button></div>
+</form>

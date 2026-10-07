@@ -1,7 +1,7 @@
 @model AttachmentUploadModel
 @using PrivateBrandsPortal.Web.Models.Enums
 @{ViewData["Title"]="Upload attachment";}
-<div class="page-heading"><div><p class="eyebrow">PROJECT DOCUMENTS</p><h1>Upload attachment</h1><p>Store the Excel source file with this project.</p></div></div>
+<div class="page-heading"><div><p class="eyebrow">PROJECT DOCUMENTS</p><h1>Upload attachment</h1><p>Store a source document with this project.</p></div></div>
 <form method="post" enctype="multipart/form-data" class="panel form-panel">
 <div asp-validation-summary="All" class="validation-summary"></div>
 <input asp-for="Input.ProjectId" type="hidden"/>
@@ -9,7 +9,7 @@
 <div class="field"><label asp-for="Input.Type"></label><select asp-for="Input.Type" asp-items="Html.GetEnumSelectList<AttachmentType>()" class="form-select" required><option value="">Select type</option></select><span asp-validation-for="Input.Type"></span></div>
 <div class="field"><label asp-for="Input.ProjectProductId"></label><select asp-for="Input.ProjectProductId" class="form-select"><option value="">Whole project</option>@foreach(var product in Model.Products){<option value="@product.Id">@product.Name</option>}</select><small>Select a product only for Calculation. Project-level Calculation covers all products.</small><span asp-validation-for="Input.ProjectProductId"></span></div>
 </div>
-<div class="field"><label asp-for="Input.File">Excel file</label><input asp-for="Input.File" type="file" accept=".xlsx,.xlsm,.xls" class="form-control" required/><span asp-validation-for="Input.File"></span></div>
+<div class="field"><label asp-for="Input.File">File</label><input asp-for="Input.File" type="file" accept=".xlsx,.xlsm,.xls,.pdf,.txt,.doc,.docx" class="form-control" required/><span asp-validation-for="Input.File"></span></div>
 <div class="field"><label asp-for="Input.Description"></label><textarea asp-for="Input.Description" class="form-control" maxlength="1000"></textarea><span asp-validation-for="Input.Description"></span></div>
 <div class="form-actions"><a class="btn btn-outline-secondary" asp-controller="Projects" asp-action="Details" asp-route-id="@Model.Input.ProjectId">Cancel</a><button class="btn btn-primary">Upload</button></div>
 </form>

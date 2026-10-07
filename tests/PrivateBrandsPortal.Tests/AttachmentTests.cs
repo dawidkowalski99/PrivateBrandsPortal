@@ -15,6 +15,45 @@ namespace PrivateBrandsPortal.Tests;
 [Collection("SQL integration")]
 public sealed class AttachmentTests
 {
+    [Fact] public async Task Removal_checks_owner_preserves_file_and_audits_soft_delete()
+    {
+        await using var s=new ProjectSqlTests.Scope();await using var other=new ProjectSqlTests.Scope();using var files=new Files();
+        var projectId=await s.Projects.SaveDraftAsync(WizardTests.ValidDraft());
+        await files.Service(s).UploadAsync(new(){ProjectId=projectId,Type=AttachmentType.Brief,File=File()},default);
+        var row=await s.Db.ProjectAttachments.AsNoTracking().SingleAsync(x=>x.ProjectId==projectId);
+        await Assert.ThrowsAsync<PortalAccessException>(()=>files.Service(other).RemoveAsync(row.Id,default));
+        Assert.Equal(projectId,await files.Service(s).RemoveAsync(row.Id,default));
+        var removed=await s.Db.ProjectAttachments.AsNoTracking().SingleAsync(x=>x.Id==row.Id);
+        Assert.NotNull(removed.DeletedAtUtc);Assert.Equal((await s.Users.GetCurrentAsync()).Id,removed.DeletedByUserId);
+        Assert.Empty((await files.Service(s).PanelAsync(projectId,default))!.Items);
+        await Assert.ThrowsAsync<PortalAccessException>(()=>files.Service(s).DownloadAsync(row.Id,default));
+        await using var stored=await files.Storage.OpenAsync(row.StorageKey,default);Assert.Equal(row.FileSize,stored.Length);
+        Assert.Single(await s.Db.AuditLogs.Where(x=>x.EntityId==projectId && x.ChangeType==AuditChangeType.AttachmentRemoved).ToListAsync());
+    }
+    [Fact] public async Task Removal_cannot_invalidate_delivered_sku_documents_and_rolls_back()
+    {
+        await using var s=new ProjectSqlTests.Scope();using var files=new Files();
+        var id=await CommercialWorkflowTests.Submitted(s);await CommercialWorkflowTests.Decide(s,id,0,ReviewDecision.Approved);
+        await files.Service(s).UploadAsync(new(){ProjectId=id,Type=AttachmentType.Offer,File=File()},default);
+        await files.Service(s).UploadAsync(new(){ProjectId=id,Type=AttachmentType.Calculation,File=File()},default);
+        var details=(await s.Projects.DetailsAsync(id))!;
+        await CommercialWorkflowTests.Commercial(s).UpdateAsync(new(){ProjectId=id,ProductId=details.Products[0].Id,Version=details.UpdatedAtUtc,Status=CommercialStatus.SalesAndDelivery});
+        var offer=await s.Db.ProjectAttachments.AsNoTracking().SingleAsync(x=>x.ProjectId==id && x.AttachmentType==AttachmentType.Offer);
+        await Assert.ThrowsAsync<ValidationException>(()=>files.Service(s).RemoveAsync(offer.Id,default));
+        Assert.Null((await s.Db.ProjectAttachments.AsNoTracking().SingleAsync(x=>x.Id==offer.Id)).DeletedAtUtc);
+        Assert.False(await s.Db.AuditLogs.AnyAsync(x=>x.EntityId==id && x.ChangeType==AuditChangeType.AttachmentRemoved));
+    }
+    [Fact] public async Task Upload_form_lists_category_and_subcategory_without_sql_collation_conflicts()
+    {
+        await using var s=new ProjectSqlTests.Scope();using var files=new Files();
+        var id=await s.Projects.SaveDraftAsync(WizardTests.ValidDraft());
+        var details=(await s.Projects.DetailsAsync(id))!;
+        var form=await files.Service(s).UploadFormAsync(new(){ProjectId=id},default);
+        Assert.Null(form.Input.ProjectProductId);
+        Assert.Equal(details.Products.Count,form.Products.Count);
+        foreach(var product in details.Products)
+            Assert.Equal($"{product.Category ?? "Legacy category"} — {product.ProductType}",form.Products.Single(x=>x.Id==product.Id).Name);
+    }
     [Fact] public async Task Same_original_filename_creates_two_files_and_missing_file_has_safe_error()
     {
         await using var s=new ProjectSqlTests.Scope();using var files=new Files();var id=await s.Projects.SaveDraftAsync(WizardTests.ValidDraft());
@@ -50,7 +89,7 @@ public sealed class AttachmentTests
     internal static IFormFile File(string name="workbook.xlsx",int size=16)=>new FormFile(new MemoryStream(new byte[size]),0,size,"File",name){Headers=new HeaderDictionary(),ContentType="text/html"};
     private static async Task SetRole(ProjectSqlTests.Scope s,AppRole role)
     {var user=await s.Users.GetCurrentAsync();await s.Db.AppUsers.Where(x=>x.Id==user.Id).ExecuteUpdateAsync(x=>x.SetProperty(u=>u.Role,role));s.Db.ChangeTracker.Clear();}
-    [Theory][InlineData(".xlsx")][InlineData(".xlsm")][InlineData(".xls")]
+    [Theory][InlineData(".xlsx")][InlineData(".xlsm")][InlineData(".xls")][InlineData(".pdf")][InlineData(".txt")][InlineData(".doc")][InlineData(".docx")]
     public async Task Upload_roundtrip_sanitizes_filename_audits_and_ignores_client_mime(string extension)
     {
         await using var s=new ProjectSqlTests.Scope();using var files=new Files();var service=files.Service(s);var id=await s.Projects.SaveDraftAsync(WizardTests.ValidDraft());
@@ -116,6 +155,8 @@ public sealed class AttachmentTests
         await CommercialWorkflowTests.Commercial(s).UpdateAsync(new(){ProjectId=id,ProductId=p.Id,Version=(await s.Projects.DetailsAsync(id))!.UpdatedAtUtc,Status=CommercialStatus.SalesAndDelivery});
         Assert.NotNull((await s.Projects.DetailsAsync(id))!.ArchivedAtUtc);
         var panel=(await files.Service(s).PanelAsync(id,default))!;Assert.False(panel.CanUpload);Assert.Equal(2,panel.Items.Count);
+        var calculation=panel.Items.Single(x=>x.Type==AttachmentType.Calculation);
+        Assert.Equal(perSku ? $"{p.Category ?? "Legacy category"} — {p.ProductType} · SKU: {p.SKU}" : "Whole project",calculation.ProductLabel);
         var download=await files.Service(s).DownloadAsync(panel.Items[0].Id,default);await download.Stream.DisposeAsync();
     }
     private sealed class AttachmentFailure : SaveChangesInterceptor

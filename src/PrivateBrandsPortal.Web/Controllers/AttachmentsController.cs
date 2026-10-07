@@ -10,6 +10,20 @@ namespace PrivateBrandsPortal.Web.Controllers;
 public sealed class AttachmentsController(AttachmentService attachments) : Controller
 {
     [HttpGet]
+    public async Task<IActionResult> Remove(int id,CancellationToken ct)
+    {
+        try { return View(await attachments.RemovalFormAsync(id,ct)); }
+        catch(PortalAccessException) { return NotFound(); }
+        catch(ValidationException ex) { TempData["Error"]=ex.Message;return RedirectToAction("Index","Projects"); }
+    }
+    [HttpPost,ActionName("Remove")]
+    public async Task<IActionResult> RemoveConfirmed(int id,CancellationToken ct)
+    {
+        try { var projectId=await attachments.RemoveAsync(id,ct);TempData["Success"]="Attachment removed.";return RedirectToAction("Details","Projects",new{id=projectId}); }
+        catch(PortalAccessException) { return NotFound(); }
+        catch(ValidationException ex) { TempData["Error"]=ex.Message;return RedirectToAction("Remove",new{id}); }
+    }
+    [HttpGet]
     public async Task<IActionResult> Upload(int projectId, CancellationToken ct)
     {
         try { return View(await attachments.UploadFormAsync(new AttachmentInput{ProjectId=projectId},ct)); }

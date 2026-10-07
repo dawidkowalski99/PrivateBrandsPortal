@@ -11,6 +11,41 @@ namespace PrivateBrandsPortal.Web.Services;
 public sealed class UserAdministrationService(ApplicationDbContext db, IAppUserService users,
     IPermissionService permissions, TimeProvider clock)
 {
+    internal const string AdministrationLock = "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'PrivateBrandsPortal.UserAdministration', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=15000; IF @r < 0 THROW 51000, 'User administration is busy. Try again.', 1;";
+    public async Task<UserCreatePage> CreateFormAsync(CancellationToken ct)
+    {
+        await permissions.RequireAsync(PermissionCodes.ManageUsers,ct);
+        var actor=await users.GetCurrentAsync(ct);
+        return new() { CanAssignSuperAdmin=actor.Role==AppRole.SuperAdmin,
+            Permissions=await db.Permissions.AsNoTracking().Where(x=>x.IsActive && x.Code!=PermissionCodes.ReassignProjects)
+                .OrderBy(x=>x.DisplayOrder).ThenBy(x=>x.Name).Select(x=>new PermissionOption(x.Id,x.Name,x.IsActive)).ToListAsync(ct) };
+    }
+    public async Task<int> CreateAsync(UserCreateInput input,CancellationToken ct)
+    {
+        input.DomainLogin=input.DomainLogin?.Trim() ?? "";input.DisplayName=input.DisplayName?.Trim() ?? "";
+        Validator.ValidateObject(input,new ValidationContext(input),true);
+        var actorId=(await users.GetCurrentAsync(ct)).Id;
+        await using var tx=await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync(AdministrationLock,ct);
+        var actor=await db.AppUsers.AsNoTracking().Include(x=>x.Permissions).ThenInclude(x=>x.Permission).SingleAsync(x=>x.Id==actorId,ct);
+        if(!PermissionService.HasPermission(actor,PermissionCodes.ManageUsers) || (input.Role==AppRole.SuperAdmin && actor.Role!=AppRole.SuperAdmin))throw new PortalAccessException();
+        if(await db.AppUsers.AnyAsync(x=>x.DomainLogin==input.DomainLogin,ct))
+            throw new ValidationException("A user with this Windows account already exists. Edit the existing account, including if it is inactive.");
+        var ids=input.PermissionIds.Distinct().ToArray();
+        if(await db.Permissions.CountAsync(x=>ids.Contains(x.Id) && x.IsActive && x.Code!=PermissionCodes.ReassignProjects,ct)!=ids.Length)
+            throw new ValidationException("Select active permissions only.");
+        var now=clock.GetUtcNow();
+        var target=new AppUser {DomainLogin=input.DomainLogin,DisplayName=input.DisplayName,Role=input.Role!.Value,IsActive=input.IsActive,CreatedAtUtc=now,UpdatedAtUtc=now};
+        db.AppUsers.Add(target);
+        try { await db.SaveChangesAsync(ct); }
+        catch(DbUpdateException ex) when(ex.InnerException is Microsoft.Data.SqlClient.SqlException {Number:2601 or 2627})
+        { throw new ValidationException("A user with this Windows account already exists. Edit the existing account."); }
+        foreach(var id in ids)db.AppUserPermissions.Add(new(){AppUserId=target.Id,PermissionId=id});
+        db.AuditLogs.Add(new AuditLog {EntityType=nameof(AppUser),EntityId=target.Id,FieldName="UserCreated",
+            NewValue=System.Text.Json.JsonSerializer.Serialize(new{target.DomainLogin,target.DisplayName,target.Role,target.IsActive,PermissionIds=ids}),
+            ChangedByUserId=actor.Id,ChangedAtUtc=now,ChangeType=AuditChangeType.Created});
+        await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return target.Id;
+    }
     public static void ProtectLastSuperAdmin(AppUser target, UserEditInput input, bool hasOtherActiveSuperAdmin)
     {
         if (target.Role == AppRole.SuperAdmin && target.IsActive && (input.Role != AppRole.SuperAdmin || !input.IsActive)
@@ -38,7 +73,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IAppUserS
         if (target is null) return null;
         if (target.Role == AppRole.SuperAdmin && actor.Role != AppRole.SuperAdmin) throw new PortalAccessException();
         return new UserEditPage {
-            Input = new() { Id = id, Version = target.UpdatedAtUtc, Role = target.Role, IsActive = target.IsActive,
+            Input = new() { Id = id, DisplayName=target.DisplayName, Version = target.UpdatedAtUtc, Role = target.Role, IsActive = target.IsActive,
                 PermissionIds = target.Permissions.Where(x => x.Permission.Code != PermissionCodes.ReassignProjects).Select(x => x.PermissionId).ToList() },
             DomainLogin = target.DomainLogin, DisplayName = target.DisplayName,
             CanAssignSuperAdmin = actor.Role == AppRole.SuperAdmin,
@@ -49,6 +84,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IAppUserS
 
     public async Task SaveAsync(UserEditInput input, CancellationToken ct)
     {
+        input.DisplayName=input.DisplayName?.Trim() ?? "";
         Validator.ValidateObject(input, new ValidationContext(input), true);
         var actorId = (await users.GetCurrentAsync(ct)).Id;
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -76,9 +112,10 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IAppUserS
                 ChangedAtUtc = now, ChangeType = AuditChangeType.Updated });
         }
         Audit(nameof(AppUser.Role), target.Role.ToString(), input.Role.ToString());
+        Audit(nameof(AppUser.DisplayName),target.DisplayName,input.DisplayName);
         Audit(nameof(AppUser.IsActive), target.IsActive.ToString(), input.IsActive.ToString());
         Audit("Permissions", string.Join(',', target.Permissions.Select(x => x.PermissionId).Order()), string.Join(',', ids.Order()));
-        target.Role = input.Role; target.IsActive = input.IsActive; target.UpdatedAtUtc = now;
+        target.DisplayName=input.DisplayName;target.Role = input.Role; target.IsActive = input.IsActive; target.UpdatedAtUtc = now;
         db.AppUserPermissions.RemoveRange(target.Permissions.Where(x => !ids.Contains(x.PermissionId)));
         foreach (var id in ids.Where(id => target.Permissions.All(x => x.PermissionId != id)))
             db.AppUserPermissions.Add(new AppUserPermission { AppUserId = target.Id, PermissionId = id });
