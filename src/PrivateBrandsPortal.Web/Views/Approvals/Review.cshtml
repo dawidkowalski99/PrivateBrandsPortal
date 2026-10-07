@@ -13,3 +13,4 @@
 @if(product.ReviewStatus == ProductReviewStatus.Pending && Model.Status is ProjectStatus.AwaitingManagerReview or ProjectStatus.PartiallyReviewed){
 <div class="card-actions"><a class="btn btn-primary" asp-action="Decision" asp-route-projectId="@Model.Id" asp-route-productId="@product.Id" asp-route-decision="Approved">Approve</a><a class="btn btn-outline-danger" asp-action="Decision" asp-route-projectId="@Model.Id" asp-route-productId="@product.Id" asp-route-decision="Rejected">Reject</a><a class="btn btn-outline-secondary" asp-action="Decision" asp-route-projectId="@Model.Id" asp-route-productId="@product.Id" asp-route-decision="EditedAndApproved">Edit &amp; Approve</a></div>}
 </article>}</div><a class="btn btn-outline-secondary" asp-action="Index">Back to Approvals</a>
+@await Component.InvokeAsync("Attachments",new {projectId=Model.Id})

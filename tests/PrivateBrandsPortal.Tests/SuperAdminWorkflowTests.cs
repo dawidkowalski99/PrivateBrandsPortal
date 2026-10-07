@@ -51,19 +51,17 @@ public sealed class SuperAdminWorkflowTests
         Assert.Equal(12345, details.Products[0].Quantity);
         Assert.NotNull(await copy.CopyAsync(details.Products[0].Id, default));
         await review.SubmitAsync(id, details.UpdatedAtUtc);
-        Assert.Contains(await review.QueueAsync(), x => x.Id == id);
-        Assert.True(await review.CountAsync() > 0);
-        var approval = (await review.FormAsync(id, details.Products[0].Id, ReviewDecision.Approved))!.Input;
-        await review.DecideAsync(approval);
-        var rejection = (await review.FormAsync(id, details.Products[1].Id, ReviewDecision.Rejected))!.Input;
-        rejection.RejectionReasonId = 7;
-        await review.DecideAsync(rejection);
-        Assert.Equal(initialAwaiting + 1, await s.Projects.AwaitingPmAsync());
+        Assert.DoesNotContain(await review.QueueAsync(), x => x.Id == id);
+        Assert.False((await s.Projects.DetailsAsync(id))!.RequiresManagerApproval);
+        Assert.False(await s.Db.ProductReviews.AnyAsync(x=>x.ProjectProduct.ProjectId==id));
+        Assert.Equal(initialAwaiting + 2, await s.Projects.AwaitingPmAsync());
+        await CommercialWorkflowTests.SupplyDocuments(s,id);
         var change = (await commercial.FormAsync(id, details.Products[0].Id, default))!.Input;
         change.Status = CommercialStatus.SalesAndDelivery;
         await commercial.UpdateAsync(change);
+        await CommercialWorkflowTests.Status(s,id,1,CommercialStatus.SalesAndDelivery);
         Assert.Contains(await commercial.ArchiveAsync(default), x => x.Id == id);
-        Assert.Equal(ProjectStatus.PartiallyApproved, (await s.Projects.DetailsAsync(id))!.Status);
+        Assert.Equal(ProjectStatus.Approved, (await s.Projects.DetailsAsync(id))!.Status);
 
         var foreignId = await other.Projects.SaveDraftAsync(WizardTests.ValidDraft());
         Assert.Null(await s.Projects.DetailsAsync(foreignId));

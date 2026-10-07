@@ -16,4 +16,7 @@ public enum AuditChangeType
     ProjectSubmitted = 5,
     [Display(Name = "Project reassigned")]
     ProjectReassigned = 6,
+    AttachmentUploaded = 7,
+    AttachmentRemoved = 8,
+    ManagerApprovalBypassed = 9,
 }

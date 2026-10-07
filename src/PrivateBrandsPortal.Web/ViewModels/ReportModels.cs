@@ -29,6 +29,7 @@ public sealed class ManagerReport
 }
 public sealed class ReportRow
 {
+    public string Formula{get;set;}="";
     public string ProjectNumber{get;set;}="";public string ProjectManager{get;set;}="";public string Customer{get;set;}="";public string Country{get;set;}="";
     public ProjectStatus ProjectStatus{get;set;}public string? Category{get;set;}public string Subcategory{get;set;}="";public string SKU{get;set;}="";
     public int Quantity{get;set;}public decimal EstimatedValue{get;set;}public decimal EstimatedMargin{get;set;}public ProductReviewStatus ReviewStatus{get;set;}

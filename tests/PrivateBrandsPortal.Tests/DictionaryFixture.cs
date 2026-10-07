@@ -7,6 +7,9 @@ namespace PrivateBrandsPortal.Tests;
 // Disposable reference data for SQL tests only. Never part of application seed data.
 public sealed class DictionaryFixture : IAsyncLifetime
 {
+    public static int ReadyFormulaId {get;private set;} = 3;
+    public static int NewFormulaId {get;private set;} = 2;
+    public static int DevelopmentFormulaId {get;private set;} = 1;
     public static int CustomerId { get; private set; } = 1;
     public static int ShampooId { get; private set; } = 1;
     public static int LotionId { get; private set; } = 2;
@@ -21,6 +24,9 @@ public sealed class DictionaryFixture : IAsyncLifetime
         var shampoo = new ProductSubcategory { ProductCategoryId=1, Name="PORTALTEST Shampoo " + Guid.NewGuid().ToString("N") };
         var lotion = new ProductSubcategory { ProductCategoryId=2, Name="PORTALTEST Body Lotion " + Guid.NewGuid().ToString("N") };
         db.AddRange(customer,shampoo,lotion); await db.SaveChangesAsync();
+        ReadyFormulaId=await db.FormulaOptions.Where(x=>x.Code=="READY_TO_GO").Select(x=>x.Id).SingleAsync();
+        NewFormulaId=await db.FormulaOptions.Where(x=>x.Code=="NEW_FORMULA").Select(x=>x.Id).SingleAsync();
+        DevelopmentFormulaId=await db.FormulaOptions.Where(x=>x.Code=="NEW_DEVELOPMENT").Select(x=>x.Id).SingleAsync();
         CustomerId=customer.Id; ShampooId=shampoo.Id; LotionId=lotion.Id;
     }
     public async Task DisposeAsync()

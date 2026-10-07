@@ -906,3 +906,96 @@ ręczne CARREFOUR → Germany zaakceptowane przez Next i zachowane po Back/refre
 BODY CARE / HAIR CARE / FACE CARE pokazują odpowiednio 13/8/6 właściwych podkategorii;
 zmiana kategorii usuwa poprzedni wybór. Nie zapisano nowego projektu testowego.
 Copy From / Duplicate i dotychczasowy workflow pokrywa pełny zestaw testów regresji.
+
+## Formula, załączniki i projekty Managera
+
+Migracja `20261006130702_FormulaAttachmentsAndManagerOwnedProjects` dodaje słownik Formula Options,
+metadane załączników oraz pola autora i trybu zatwierdzania. Nie zmienia poprzednich migracji.
+Jednorazowo tworzy NEW_DEVELOPMENT (New development (extended timeline)), NEW_FORMULA
+(New formula (standard timeline)) i READY_TO_GO (Ready to go). Stare ReadyToGo/NewFormula
+są mapowane na odpowiednie rekordy. Historyczny enum pozostaje jako fallback dla NULL.
+Kod słownikowy jest niezmienny; nazwa, opis, kolejność i aktywność są edytowalne przez
+Manage dictionaries / SuperAdmin. Nie ma hard delete. Niezmieniona historyczna formuła
+może zostać zachowana po dezaktywacji; nowy wybór wymaga aktywnego wpisu.
+
+### Konfiguracja plików
+
+`FileStorage:RootPath` ustaw poza repozytorium (DEV: User Secrets, PROD: bezpieczna
+konfiguracja hosta). Katalog musi być bezwzględny i już dostępny; aplikacja tworzy wyłącznie
+podkatalogi. Nie tworzy udziału SMB i nie zmienia ACL. Przykład polecenia z własną ścieżką:
+
+```powershell
+.\dotnet.ps1 user-secrets set "FileStorage:RootPath" "<absolute-storage-path>" --project src/PrivateBrandsPortal.Web
+```
+
+DEV używa zatwierdzonego udziału z podkatalogiem `PrivateBrandsPortal\Attachments_DEV`.
+PROD należy skonfigurować oddzielnie jako `PrivateBrandsPortal\Attachments_PROD` na
+zatwierdzonym udziale. Nie kopiować dokumentów testowych DEV do PROD.
+Żaden rzeczywisty adres środowiska ani hasło nie jest potrzebne w appsettings repozytorium.
+
+`FileStorage:MaxFileSizeMb` ma domyślnie 25, `AllowedExtensions`: .xlsx, .xlsm, .xls.
+Limit sprawdzany jest zarówno na deklarowanej długości, jak i podczas czytania strumienia.
+Pliki są przechowywane jako nieinterpretowane bajty; portal nie otwiera Excela i nie wykonuje makr.
+Typ pobieranej zawartości wynika z rozszerzenia, nie z MIME dostarczonego przez przeglądarkę.
+Dla IIS należy również dopasować limit request filtering `maxAllowedContentLength` oraz
+limit reverse proxy do maksymalnego żądania (do 10 plików na jeden upload Brief + narzut).
+Nie zmieniamy jeszcze konfiguracji produkcyjnego IIS.
+
+Konto procesu aplikacji / Application Pool potrzebuje Read, Write, Modify wyłącznie w
+katalogu storage; preferowane dedykowane konto domenowe. Uprawnienia udziału i NTFS muszą
+na to pozwalać. Użytkownicy portalu nie potrzebują bezpośredniego dostępu SMB. Pliki nie są
+w wwwroot ani SQL. URL pobrania zawiera wyłącznie ID załącznika; kontroler sprawdza aktualnego
+właściciela, rolę i etap. Manager cudzy projekt: tylko Brief na etapie review. Owner i SuperAdmin:
+dokumenty projektu, również po Archive. Upload: owner lub SuperAdmin, przed archiwizacją.
+Nie dodano operacji usuwania; pola soft delete przygotowano, a oznaczone rekordy są ignorowane.
+
+StorageKey jest generowany przez serwer (GUID), walidowany i rozwiązywany pod root.
+Nie używa OriginalFileName jako ścieżki. Nazwa do wyświetlenia jest oczyszczana; Razor ją koduje.
+Istniejące dowiązania/reparse points w podkatalogach są odrzucane. Konto aplikacji powinno
+być jedynym kontem zapisującym zawartość storage poza zaufaną administracją IT.
+SQL przechowuje typ, projekt, opcjonalny produkt, nazwę, klucz, MIME, rozmiar, SHA-256,
+autora, UTC, opis i pola soft delete. Audit zawiera typ, nazwę, ID produktu/SKU oraz autora i UTC.
+
+### Brief przed zapisem projektu i spójność
+
+Opcjonalne wielokrotne Brief w kroku 1 są wysyłane po Next. Pliki trafiają do
+`temp/<AppUserId>/<WizardToken>/<guid>.<ext>`. Wizard przechowuje wyłącznie ograniczone metadata,
+nie bajty ani encje EF. Refresh/Back zachowują stan. Save Draft kopiuje pliki do
+`projects/<ProjectId>/`, zapisuje metadane i audit w transakcji projektu. Po commit usuwa temp.
+Po błędzie SQL usuwa nowo utworzone pliki, pozostawiając temp do ponowienia. SQL i filesystem
+nie mają wspólnej transakcji: po awarii procesu/zasilania może zostać osierocony plik.
+Błąd compensation jest logowany z kluczem; IT powinno uzgadniać takie klucze z SQL przed
+kontrolowanym usunięciem. Backup/restore musi obejmować spójny zestaw SQL i storage.
+Nie wolno usuwać plików projects wyłącznie na podstawie ich wieku.
+
+Usunięcie starego temp można wykonać ręcznie (konto z dostępem do skonfigurowanego storage):
+
+```powershell
+.\dotnet.ps1 run --project src/PrivateBrandsPortal.Web -- --cleanup-temp-attachments
+```
+
+Polecenie usuwa tylko temp starsze niż 24 godziny; nie uruchamia serwera HTTP ani nie zmienia SQL.
+Nie dodano zadania cyklicznego. Brak storage daje bezpieczny komunikat dla operacji na pliku;
+nie blokuje startu portalu ani Dashboard. Testy używają izolowanych katalogów tymczasowych,
+bez zależności od udziału SMB.
+
+### Dokumenty przed Sales & Delivery
+
+Offer jest projektowa. Calculation może być projektowa (obejmuje wszystkie SKU) albo dotyczyć
+konkretnego produktu tego projektu. Brief nie zastępuje żadnego z nich. Przy Implementation
+into production Details pokazuje wymagane dokumenty Available/Missing. Serwis blokuje Sales
+and delivery, dopóki nie ma aktywnej Offer oraz Calculation projektowej lub dokładnie dla tego SKU.
+Nie zmienia wówczas statusu ani archiwizacji. Upload/transfer/commercial blokują wspólny rekord
+projektu w transakcji, aby decyzja i ownership nie rozjechały się podczas zapisu.
+
+### Manager-created projects
+
+Nowy PM Draft: RequiresManagerApproval=true i dotychczasowe Submit for Approval.
+Nowy Manager/SuperAdmin Draft: false i Finalize project. Finalizacja waliduje dane i ustawia
+Approved, bez ProductReview i bez kolejki/badge Approvals. Audit ManagerApprovalBypassed
+wyjaśnia pominięcie; UI pokazuje Approval not required. Produkty zaczynają commercial ze statusem NULL.
+Manager prowadzi tylko własne projekty; cudze review nadal jest osobnym uprawnieniem.
+CreatedByUserId jest niezmiennym autorem, ProjectManagerId bieżącym właścicielem.
+Dawne projekty zachowują RequiresManagerApproval=true, a nieznany historyczny autor pozostaje NULL.
+Transfer do aktywnego PM/Manager/SuperAdmin nie zmienia autora ani trybu zatwierdzania,
+nie kopiuje plików i nie zmienia UploadedBy. Raporty nadal agregują według bieżącego ownera.

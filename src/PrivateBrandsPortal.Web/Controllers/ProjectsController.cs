@@ -8,7 +8,7 @@ namespace PrivateBrandsPortal.Web.Controllers;
 
 [ServiceFilter(typeof(ProjectAccessFilter))]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals, ProductCopyService copies, ProjectDictionaryService lookups) : Controller
+public sealed class ProjectsController(IProjectService projects, IAppUserService users, WizardStore store, IApprovalService approvals, ProductCopyService copies, ProjectDictionaryService lookups, AttachmentService? attachments = null) : Controller
 {
     public async Task<IActionResult> Index(CancellationToken ct, string? search = null) {
         if(search?.Length>200)return BadRequest();
@@ -32,7 +32,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
     public async Task<IActionResult> SubmitConfirmed(int id, DateTimeOffset? version, CancellationToken ct)
     {
         if (!version.HasValue || !ModelState.IsValid) return BadRequest();
-        try { await approvals.SubmitAsync(id, version.Value, ct); TempData["Success"] = "Project submitted for manager review."; }
+        try { await approvals.SubmitAsync(id, version.Value, ct); TempData["Success"] = "Project workflow updated."; }
         catch (ValidationException ex) { TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
     }
@@ -66,7 +66,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             Token = state.Token, Revision = state.Revision, Step = step, Draft = draft, Brief = draft.Brief,
             Product = product ?? new(), ShowProductForm = showProduct, ProjectManager = user.DisplayName,
             Customers = await lookups.CustomersAsync(ct), Subcategories = await lookups.SubcategoriesAsync(ct),
-            Countries = await projects.CountriesAsync(ct), ProductTypes = await projects.ProductCategoriesAsync(ct)
+            FormulaOptions = await lookups.FormulasAsync(ct), Countries = await projects.CountriesAsync(ct), ProductTypes = await projects.ProductCategoriesAsync(ct)
         });
     }
     private IActionResult Next(WizardState state, int step) =>
@@ -96,7 +96,7 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             return await Page(state, step, ct, product is null ? null : WizardStore.Snapshot(new DraftInput { Products = [product] }).Products[0], add || edit.HasValue);
         });
     [HttpPost]
-    public Task<IActionResult> Brief(Guid token, int revision, [Bind(Prefix = "Brief")] BriefInput input, CancellationToken ct) =>
+    public Task<IActionResult> Brief(Guid token, int revision, [Bind(Prefix = "Brief")] BriefInput input, CancellationToken ct, List<IFormFile>? briefFiles = null) =>
         With(token, ct, async state => {
             if (state.SavedProjectId.HasValue) return RedirectToAction(nameof(Details), new { id = state.SavedProjectId });
             if (!Fresh(state, revision)) return await Page(state, 1, ct);
@@ -106,6 +106,13 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
             if (!(await projects.CountriesAsync(ct)).Any(x => x.Id == input.CountryId))
                 ModelState.AddModelError("Brief.CountryId", "Select an active country.");
             if (!ModelState.IsValid) return await Page(state, 1, ct);
+            if(briefFiles?.Count>0) {
+                if(attachments is null) throw new ValidationException("Attachment storage is unavailable.");
+                if(state.Draft.TemporaryBriefs.Count+briefFiles.Count>20){ModelState.AddModelError("","A workspace supports up to 20 brief attachments.");return await Page(state,1,ct);}
+                try { state.Draft.TemporaryBriefs.AddRange(await attachments.UploadTemporaryAsync(state.Token,briefFiles,ct)); }
+                catch(ValidationException ex){ModelState.AddModelError("",ex.Message);return await Page(state,1,ct);}
+            }
+            state.Draft.WizardToken=state.Token;
             state.Draft.Brief = input; state.BriefCompleted = true; state.Revision++;
             return Next(state, 2);
         });
@@ -122,6 +129,8 @@ public sealed class ProjectsController(IProjectService projects, IAppUserService
                 ModelState.Remove("Product.ProductCategoryId");
             try { await lookups.ResolveProductAsync(input, existing?.PersistedId.HasValue == true ? existing : null, ct); }
             catch (ValidationException ex) { ModelState.AddModelError("Product.ProductSubcategoryId", ex.Message); }
+            try { await lookups.ResolveFormulaAsync(input, existing?.PersistedId is int existingId ? new Models.Entities.ProjectProduct { Id=existingId, SKU=existing.SKU, FormulaOptionId=existing.FormulaOptionId, FormulaStatus=existing.FormulaStatus ?? Models.Enums.FormulaStatus.ReadyToGo } : null, ct); }
+            catch (ValidationException ex) { ModelState.AddModelError("Product.FormulaOptionId", ex.Message); }
             if (existing is null && state.Draft.Products.Count >= 500) ModelState.AddModelError("", "A draft supports up to 500 products.");
             if (!ModelState.IsValid) return await Page(state, 2, ct, input, true);
             if (existing is not null) state.Draft.Products[state.Draft.Products.IndexOf(existing)] = input;

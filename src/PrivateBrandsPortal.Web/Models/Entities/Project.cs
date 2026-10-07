@@ -7,6 +7,9 @@ public sealed class Project
     public int? CustomerId { get; set; }
     public Customer? CustomerEntry { get; set; }
     public int Id { get; set; }
+    public int? CreatedByUserId { get; set; }
+    public AppUser? CreatedByUser { get; set; }
+    public bool RequiresManagerApproval { get; set; } = true;
     public required string ProjectNumber { get; set; }
     public required string Customer { get; set; }
     public int CountryId { get; set; }

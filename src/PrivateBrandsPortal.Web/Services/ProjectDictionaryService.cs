@@ -7,6 +7,27 @@ public sealed record CustomerOption(int Id, string Name, int? DefaultCountryId);
 public sealed record SubcategoryOption(int Id, int CategoryId, string Name);
 public sealed class ProjectDictionaryService(ApplicationDbContext db)
 {
+    private Dictionary<int, Models.Entities.FormulaOption>? formulas;
+    public async Task<IReadOnlyList<LookupItem>> FormulasAsync(CancellationToken ct = default) =>
+        await db.FormulaOptions.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
+            .Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct);
+
+    public async Task ResolveFormulaAsync(ProductInput input, Models.Entities.ProjectProduct? saved, CancellationToken ct)
+    {
+        formulas ??= await db.FormulaOptions.AsNoTracking().ToDictionaryAsync(x=>x.Id,ct);
+        if (saved is not null && saved.FormulaOptionId == input.FormulaOptionId)
+        {
+            input.FormulaStatus = saved.FormulaStatus;
+            input.FormulaName = saved.FormulaOptionId.HasValue
+                ? formulas.GetValueOrDefault(saved.FormulaOptionId.Value)?.Name : null;
+            return;
+        }
+        var formula = input.FormulaOptionId.HasValue ? formulas.GetValueOrDefault(input.FormulaOptionId.Value) : null;
+        if(formula is null || !formula.IsActive) throw new ValidationException("Select an active formula option.");
+        input.FormulaName = formula.Name;
+        // The legacy column remains for historical compatibility; dictionary identity drives all new UI.
+        input.FormulaStatus = formula.Code == "READY_TO_GO" ? Models.Enums.FormulaStatus.ReadyToGo : Models.Enums.FormulaStatus.NewFormula;
+    }
     private Dictionary<int, SubcategoryOption>? activeSubcategories;
     public async Task<IReadOnlyList<CustomerOption>> CustomersAsync(CancellationToken ct = default) =>
         await db.Customers.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)

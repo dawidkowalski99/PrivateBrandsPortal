@@ -1,0 +1,12 @@
+@model AttachmentPanel
+@using PrivateBrandsPortal.Web.Models.Enums
+<section class="panel form-panel mt-4" aria-label="Project attachments">
+<div class="section-heading"><div><p class="eyebrow">SOURCE DOCUMENTS</p><h2>Attachments</h2></div>@if(Model.CanUpload){<a class="btn btn-outline-primary" asp-controller="Attachments" asp-action="Upload" asp-route-projectId="@Model.ProjectId">+ Upload attachment</a>}</div>
+@foreach(var type in Enum.GetValues<AttachmentType>()){
+var files=Model.Items.Where(x=>x.Type==type).ToList();
+<h3 class="mt-3">@type</h3>
+@if(files.Count==0){<p class="text-muted">No accessible attachments.</p>}
+@foreach(var file in files){<article class="panel p-3 mb-2"><a asp-controller="Attachments" asp-action="Download" asp-route-id="@file.Id">@file.FileName — Download</a><p class="mb-0 text-muted">@(file.SKU ?? "Whole project") · @file.Size.ToString("N0") bytes · @file.UploadedBy · @file.UploadedAtUtc.ToLocalTime().ToString("g")</p>@if(!string.IsNullOrWhiteSpace(file.Description)){<p class="mb-0">@file.Description</p>}</article>}
+}
+@foreach(var requirement in Model.Requirements){<div class="alert alert-info mt-3"><h3>Required before Sales &amp; Delivery — @requirement.SKU</h3><p>Offer: <strong>@(requirement.Offer?"Available":"Missing")</strong><br/>Calculation for this SKU: <strong>@(requirement.Calculation?"Available":"Missing")</strong></p>@if(Model.CanUpload && (!requirement.Offer || !requirement.Calculation)){<a asp-controller="Attachments" asp-action="Upload" asp-route-projectId="@Model.ProjectId">Upload missing documents</a>}</div>}
+</section>

@@ -1,6 +1,6 @@
 @model ProjectDetailsViewModel
 @using PrivateBrandsPortal.Web.Models.Enums
-@if (Model.Status is ProjectStatus.Approved or ProjectStatus.Rejected or ProjectStatus.PartiallyApproved)
+@if (Model.RequiresManagerApproval && Model.Status is (ProjectStatus.Approved or ProjectStatus.Rejected or ProjectStatus.PartiallyApproved))
 {
     <section class="panel form-panel decision-summary" aria-labelledby="decision-summary-title">
         <p class="eyebrow">REVIEW COMPLETE</p>

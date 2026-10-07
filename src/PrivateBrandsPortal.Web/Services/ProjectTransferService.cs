@@ -20,7 +20,7 @@ public sealed class ProjectTransferService(ApplicationDbContext db, IAppUserServ
         var project = await db.Projects.AsNoTracking().Include(x => x.ProjectManager).SingleOrDefaultAsync(x => x.Id == id, ct);
         if (project is null) return null;
         var candidates = await db.AppUsers.AsNoTracking().Where(x => x.IsActive && x.Id != project.ProjectManagerId &&
-            (x.Role == AppRole.ProjectManager || x.Role == AppRole.SuperAdmin)).OrderBy(x => x.DisplayName).ThenBy(x => x.Id)
+            (x.Role == AppRole.ProjectManager || x.Role == AppRole.Manager || x.Role == AppRole.SuperAdmin)).OrderBy(x => x.DisplayName).ThenBy(x => x.Id)
             .Select(x => new { x.Id, x.DisplayName, x.DomainLogin }).ToListAsync(ct);
         return new() {
             ProjectNumber = project.ProjectNumber, CurrentProjectManager = Identity(project.ProjectManager),
@@ -46,7 +46,7 @@ public sealed class ProjectTransferService(ApplicationDbContext db, IAppUserServ
             throw new ValidationException("The project has changed. Reload it and try again.");
         var target = await db.AppUsers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.NewProjectManagerId, ct);
         if (target is null || !WorkflowAccess.Allows(target, AppRole.ProjectManager))
-            throw new ValidationException("Select an active Project Manager or SuperAdmin.");
+            throw new ValidationException("Select an active Project Manager, Manager or SuperAdmin.");
         // The atomic versioned UPDATE below is the serialization point for project changes.
         if (project.ProjectManagerId == target.Id) throw new ValidationException("Select a different Project Manager.");
         var now = clock.GetUtcNow(); if (now <= project.UpdatedAtUtc) now = project.UpdatedAtUtc.AddTicks(1);

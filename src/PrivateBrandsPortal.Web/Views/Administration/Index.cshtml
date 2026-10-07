@@ -7,7 +7,7 @@
 }
 @if(await Permissions.HasAsync(PermissionCodes.ManageDictionaries)){
 <h2 class="mt-4">Dictionaries</h2><div class="admin-grid">
-@foreach(var item in new[]{("Customers","Customers"),("ProductSubcategories","Product Subcategories"),("Countries","Countries"),("ProductCategories","Product Categories"),("RejectionReasons","Rejection Reasons")}){
+@foreach(var item in new[]{("FormulaOptions","Formula Options"),("Customers","Customers"),("ProductSubcategories","Product Subcategories"),("Countries","Countries"),("ProductCategories","Product Categories"),("RejectionReasons","Rejection Reasons")}){
 <a class="panel admin-card" asp-controller="Dictionaries" asp-action="Index" asp-route-kind="@item.Item1"><h2>@item.Item2</h2><p>Add, edit or deactivate entries.</p></a>
 }</div>
 }else{<section class="panel form-panel mt-4"><h2>Dictionaries</h2><p>Ask a user administrator for Manage dictionaries access.</p></section>}

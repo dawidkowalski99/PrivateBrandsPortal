@@ -25,7 +25,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         if (!WorkflowAccess.Allows(user, role) && !(role == AppRole.Manager && demo.AllowsManagerReview(user))) throw new PortalAccessException();
         return user;
     }
-    private IQueryable<Project> Waiting() => db.Projects.Where(x =>
+    private IQueryable<Project> Waiting() => db.Projects.Where(x => x.RequiresManagerApproval &&
         (x.Status == ProjectStatus.AwaitingManagerReview || x.Status == ProjectStatus.PartiallyReviewed)
         && x.Products.Any(p => p.ReviewStatus == ProductReviewStatus.Pending));
     public async Task<int> CountAsync(CancellationToken ct = default)
@@ -47,7 +47,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
     public async Task<ProjectDetailsViewModel?> ReviewAsync(int id, CancellationToken ct = default)
     {
         var user = await RequireAsync(AppRole.Manager, ct);
-        return await ProjectDetailsReader.ReadAsync(db, db.Projects.Where(x => x.Id == id && (user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id) &&
+        return await ProjectDetailsReader.ReadAsync(db, db.Projects.Where(x => x.Id == id && x.RequiresManagerApproval && (user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id) &&
             (x.Status == ProjectStatus.AwaitingManagerReview || x.Status == ProjectStatus.PartiallyReviewed ||
              x.Status == ProjectStatus.Approved || x.Status == ProjectStatus.Rejected || x.Status == ProjectStatus.PartiallyApproved)), ct);
     }
@@ -59,13 +59,13 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         var product = project.Products.SingleOrDefault(x => x.Id == productId && x.ReviewStatus == ProductReviewStatus.Pending);
         if (product is null) return null;
         return new ReviewFormModel { Project = project,
-            Subcategories = await new ProjectDictionaryService(db).SubcategoriesAsync(ct),
+            FormulaOptions = await new ProjectDictionaryService(db).FormulasAsync(ct), Subcategories = await new ProjectDictionaryService(db).SubcategoriesAsync(ct),
             RejectionReasons = await db.RejectionReasons.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new ReasonItem(x.Id,x.Name,x.RequiresComment)).ToListAsync(ct), ProductTypes = await db.ProductCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).Select(x => new LookupItem(x.Id, x.Name)).ToListAsync(ct),
             Input = new ReviewInput { ProjectId = projectId, ProductId = productId, ProjectVersion = project.UpdatedAtUtc,
                 ProductVersion = product.UpdatedAtUtc, Decision = decision,
                 Product = decision == ReviewDecision.EditedAndApproved ? new ProductInput {
                     ProductCategoryId = product.ProductCategoryId, ProductSubcategoryId = product.ProductSubcategoryId, Subcategory = product.ProductType, SKU = product.SKU, Quantity = product.Quantity,
-                    EstimatedValue = product.EstimatedValue, EstimatedMargin = product.EstimatedMargin, FormulaStatus = product.FormulaStatus } : null }
+                    EstimatedValue = product.EstimatedValue, EstimatedMargin = product.EstimatedMargin, FormulaName=product.FormulaName, FormulaOptionId=product.FormulaOptionId, FormulaStatus = product.FormulaStatus } : null }
         };
     }
     public async Task SubmitAsync(int id, DateTimeOffset version, CancellationToken ct = default)
@@ -89,12 +89,14 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         if (await db.ProductCategories.CountAsync(x => types.Contains(x.Id) && x.IsActive, ct) != types.Length) throw new ValidationException("All product categories must be active.");
         if (project.Products.Any(x => x.ReviewStatus != ProductReviewStatus.Pending) || await db.ProductReviews.AnyAsync(x => x.ProjectProduct.ProjectId == id, ct))
             throw new ValidationException("This project already has review decisions.");
-        project.Status = ProjectStatus.AwaitingManagerReview;
+        project.Status = project.RequiresManagerApproval ? ProjectStatus.AwaitingManagerReview : ProjectStatus.Approved;
+        if(!project.RequiresManagerApproval) foreach(var product in project.Products){product.ReviewStatus=ProductReviewStatus.Approved;product.CommercialStatus=null;product.UpdatedAtUtc=now;}
         project.SubmittedAtUtc = now;
         project.UpdatedAtUtc = now;
         db.AuditLogs.Add(new AuditLog { EntityType = nameof(Project), EntityId = id, FieldName = nameof(Project.Status),
             OldValue = ProjectStatus.Draft.ToString(), NewValue = project.Status.ToString(), ChangedByUserId = user.Id,
-            ChangedAtUtc = now, ChangeType = AuditChangeType.ProjectSubmitted });
+            ChangedAtUtc = now, ChangeType = project.RequiresManagerApproval ? AuditChangeType.ProjectSubmitted : AuditChangeType.ManagerApprovalBypassed,
+            Reason=project.RequiresManagerApproval ? null : "Project created by authorized Manager; separate manager approval not required." });
         await db.SaveChangesAsync(ct);
 
         await tx.CommitAsync(ct);
@@ -121,7 +123,7 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = Later(input.ProjectVersion!.Value);
         // Lock the parent first: concurrent decisions on different products cannot lose the aggregate status.
-        var changed = await db.Projects.Where(x => x.Id == input.ProjectId && (user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id) && x.UpdatedAtUtc == input.ProjectVersion &&
+        var changed = await db.Projects.Where(x => x.Id == input.ProjectId && x.RequiresManagerApproval && (user.Role!=AppRole.ProjectManager || x.ProjectManagerId==user.Id) && x.UpdatedAtUtc == input.ProjectVersion &&
             (x.Status == ProjectStatus.AwaitingManagerReview || x.Status == ProjectStatus.PartiallyReviewed))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.UpdatedAtUtc, now), ct);
         if (changed != 1) throw new ValidationException("The project changed or review is closed. Reopen review to continue.");
@@ -152,7 +154,10 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
             // Decimal equality ignores scale: unchanged 25 and 25.00 produce no history.
             if (product.EstimatedValue != p.EstimatedValue) Audit(nameof(product.EstimatedValue), product.EstimatedValue, p.EstimatedValue!.Value);
             if (product.EstimatedMargin != p.EstimatedMargin) Audit(nameof(product.EstimatedMargin), product.EstimatedMargin, p.EstimatedMargin!.Value);
-            Audit(nameof(product.FormulaStatus), product.FormulaStatus, p.FormulaStatus!.Value);
+            await new ProjectDictionaryService(db).ResolveFormulaAsync(p, product, ct);
+            var oldFormula = product.FormulaOptionId.HasValue ? await db.FormulaOptions.Where(x=>x.Id==product.FormulaOptionId).Select(x=>x.Name).SingleAsync(ct) : product.FormulaStatus.ToString();
+            Audit("Formula", oldFormula, p.FormulaName ?? p.FormulaStatus.ToString());
+            product.FormulaOptionId = p.FormulaOptionId;
             product.ProductSubcategoryId=p.ProductSubcategoryId;
             product.ProductCategoryId = p.ProductCategoryId; product.Subcategory = snapshot; product.SKU = p.SKU; product.Quantity = p.Quantity!.Value;
             product.EstimatedValue = p.EstimatedValue!.Value; product.EstimatedMargin = p.EstimatedMargin!.Value; product.FormulaStatus = p.FormulaStatus!.Value;

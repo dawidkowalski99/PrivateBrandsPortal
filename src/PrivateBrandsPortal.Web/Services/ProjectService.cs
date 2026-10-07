@@ -8,7 +8,7 @@ using PrivateBrandsPortal.Web.ViewModels;
 namespace PrivateBrandsPortal.Web.Services;
 
 public sealed class ProjectService(ApplicationDbContext db, IAppUserService users,
-    IProjectNumberGenerator numbers, TimeProvider clock) : IProjectService
+    IProjectNumberGenerator numbers, TimeProvider clock, AttachmentService? attachments = null) : IProjectService
 {
     private async Task<AppUser> OwnerAsync(CancellationToken ct)
     {
@@ -50,7 +50,7 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
     public async Task<DraftInput?> LoadDraftAsync(int id, CancellationToken ct = default)
     {
         var user = await OwnerAsync(ct);
-        var project = await db.Projects.AsNoTracking().Include(x => x.Products).ThenInclude(x => x.ProductType)
+        var project = await db.Projects.AsNoTracking().Include(x => x.Products).ThenInclude(x => x.ProductType).Include(x => x.Products).ThenInclude(x => x.FormulaOption)
             .SingleOrDefaultAsync(x => x.Id == id && x.ProjectManagerId == user.Id && x.Status == ProjectStatus.Draft, ct);
         if (project is null) return null;
         return new DraftInput {
@@ -58,7 +58,7 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
             Brief = new BriefInput { CustomerId = project.CustomerId, Customer = project.Customer, CountryId = project.CountryId },
             Products = project.Products.OrderBy(x => x.Id).Select(x => new ProductInput {
                 PersistedId = x.Id, ProductTypeId = x.ProductTypeId, ProductCategoryId = x.ProductCategoryId, ProductSubcategoryId = x.ProductSubcategoryId, Subcategory = x.Subcategory ?? x.ProductType?.Name ?? "Legacy product", SKU = x.SKU, Quantity = x.Quantity,
-                EstimatedValue = x.EstimatedValue, EstimatedMargin = x.EstimatedMargin, FormulaStatus = x.FormulaStatus
+                EstimatedValue = x.EstimatedValue, EstimatedMargin = x.EstimatedMargin, FormulaOptionId=x.FormulaOptionId, FormulaName=x.FormulaOption?.Name, FormulaStatus = x.FormulaStatus
             }).ToList()
         };
     }
@@ -107,13 +107,15 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
             var submittedIds = input.Products.Where(x => x.PersistedId.HasValue).Select(x => x.PersistedId!.Value).ToArray();
             if (submittedIds.Distinct().Count() != submittedIds.Length || submittedIds.Any(x => !existingIds.Contains(x)))
                 throw new ValidationException("Invalid product reference.");
+            var removedIds=project.Products.Where(x=>!submittedIds.Contains(x.Id)).Select(x=>x.Id).ToArray();
+            if(await db.ProjectAttachments.AnyAsync(x=>x.ProjectProductId.HasValue && removedIds.Contains(x.ProjectProductId.Value),ct))throw new ValidationException("A product with attachments cannot be removed. Keep its document history.");
             db.ProjectProducts.RemoveRange(project.Products.Where(x => !submittedIds.Contains(x.Id)));
         }
         else
         {
             if (input.Products.Any(x => x.PersistedId.HasValue)) throw new ValidationException("Invalid product reference.");
             project = new Project { ProjectNumber = await numbers.GenerateAsync(ct), Customer = input.Brief.Customer,
-                ProjectManagerId = user.Id, CreatedAtUtc = now, UpdatedAtUtc = now, Status = ProjectStatus.Draft };
+                ProjectManagerId = user.Id, CreatedByUserId = user.Id, RequiresManagerApproval = user.Role == AppRole.ProjectManager, CreatedAtUtc = now, UpdatedAtUtc = now, Status = ProjectStatus.Draft };
             db.Projects.Add(project);
         }
         var lookups = new ProjectDictionaryService(db);
@@ -141,11 +143,25 @@ public sealed class ProjectService(ApplicationDbContext db, IAppUserService user
             product.Quantity = item.Quantity!.Value;
             product.EstimatedValue = item.EstimatedValue!.Value;
             product.EstimatedMargin = item.EstimatedMargin!.Value;
+            await lookups.ResolveFormulaAsync(item, item.PersistedId.HasValue ? product : null, ct);
+            product.FormulaOptionId = item.FormulaOptionId;
             product.FormulaStatus = item.FormulaStatus!.Value;
             product.UpdatedAtUtc = now;
         }
         await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        var createdKeys = new List<string>();
+        try {
+            if(input.TemporaryBriefs.Count>0) {
+                if(attachments is null) throw new ValidationException("Attachment storage is unavailable.");
+                await attachments.PromoteBriefsAsync(project,input.TemporaryBriefs,input.WizardToken,createdKeys,ct);
+                await db.SaveChangesAsync(ct);
+            }
+            await transaction.CommitAsync(ct);
+        } catch { if(attachments is not null) await attachments.CleanupFilesAsync(createdKeys); throw; }
+        if(attachments is not null && input.TemporaryBriefs.Count>0) {
+            await attachments.CleanupFilesAsync(input.TemporaryBriefs.Select(x=>x.StorageKey));
+            input.TemporaryBriefs.Clear();
+        }
         return project.Id;
     }
 }

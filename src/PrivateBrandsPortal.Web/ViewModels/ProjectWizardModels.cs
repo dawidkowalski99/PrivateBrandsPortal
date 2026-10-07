@@ -29,7 +29,10 @@ public sealed class ProductInput : IValidatableObject
     public decimal? EstimatedValue { get; set; }
     [Required, Range(typeof(decimal), "0", "100", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true), Display(Name = "Estimated Margin %")]
     public decimal? EstimatedMargin { get; set; }
-    [Required, EnumDataType(typeof(FormulaStatus)), Display(Name = "Formula")]
+    [Range(1,int.MaxValue), Display(Name = "Formula")] public int? FormulaOptionId { get; set; }
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever, Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+    public string? FormulaName { get; set; }
+    [EnumDataType(typeof(FormulaStatus)), Display(Name = "Legacy formula")]
     public FormulaStatus? FormulaStatus { get; set; }
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
@@ -41,6 +44,8 @@ public sealed class ProductInput : IValidatableObject
 }
 public sealed class DraftInput
 {
+    public Guid WizardToken { get; set; }
+    public List<TemporaryBrief> TemporaryBriefs { get; set; } = [];
     public int? ProjectId { get; set; }
     public DateTimeOffset? OriginalUpdatedAtUtc { get; set; }
     public BriefInput Brief { get; set; } = new();
@@ -54,7 +59,7 @@ public sealed class WizardViewModel
     public ProductCardViewModel Card(ProductInput product) => new(
         product.Subcategory,
         product.SKU, product.Quantity!.Value, product.EstimatedValue!.Value,
-        product.EstimatedMargin!.Value, product.FormulaStatus!.Value) { Category = ProductTypes.FirstOrDefault(x => x.Id == product.ProductCategoryId)?.Name };
+        product.EstimatedMargin!.Value, product.FormulaStatus ?? FormulaStatus.ReadyToGo) { FormulaOptionId=product.FormulaOptionId, FormulaName=product.FormulaName, Category = ProductTypes.FirstOrDefault(x => x.Id == product.ProductCategoryId)?.Name };
     public Guid Token { get; set; }
     public int Revision { get; set; }
     public int Step { get; set; } = 1;
@@ -63,6 +68,7 @@ public sealed class WizardViewModel
     public ProductInput Product { get; set; } = new();
     public bool ShowProductForm { get; set; }
     public string ProjectManager { get; set; } = "";
+    public IReadOnlyList<LookupItem> FormulaOptions { get; set; } = [];
     public IReadOnlyList<LookupItem> Countries { get; set; } = [];
     public IReadOnlyList<LookupItem> ProductTypes { get; set; } = [];
 }
@@ -80,6 +86,8 @@ public sealed class ProjectListItemViewModel
 }
 public sealed class ProjectDetailsViewModel
 {
+    public bool RequiresManagerApproval {get;set;} = true;
+    public int ProjectManagerId {get;set;}
     public List<ProjectTransferHistory> Transfers { get; set; } = [];
     public DateTimeOffset? SubmittedAtUtc { get; set; }
     public DateTimeOffset? ArchivedAtUtc { get; set; }
@@ -96,6 +104,8 @@ public sealed class ProjectDetailsViewModel
 public sealed record ProductCardViewModel(string ProductType, string SKU, int Quantity,
     decimal EstimatedValue, decimal EstimatedMargin, FormulaStatus FormulaStatus)
 {
+    public int? FormulaOptionId { get; init; }
+    public string? FormulaName { get; init; }
     public int Id { get; init; }
     public int? ProductTypeId { get; init; }
     public int? ProductCategoryId { get; init; }

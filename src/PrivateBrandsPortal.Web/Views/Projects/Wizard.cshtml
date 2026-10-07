@@ -12,13 +12,15 @@
 <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
 @if (Model.Step == 1)
 {
-<form asp-action="Brief" method="post" class="panel form-panel">
+<form asp-action="Brief" method="post" enctype="multipart/form-data" class="panel form-panel">
 <input type="hidden" asp-for="Token" /><input type="hidden" asp-for="Revision" />
 <div class="section-intro"><span class="eyebrow">STEP 01</span><h2>The customer brief</h2><p>Who are we creating this project for?</p></div>
 <div class="form-grid">
 <div class="field"><label asp-for="Brief.CustomerId"></label><select asp-for="Brief.CustomerId" data-country-target="Brief_CountryId" class="form-select" required="@(!Model.Draft.ProjectId.HasValue)"><option value="">@(Model.Draft.ProjectId.HasValue && Model.Brief.CustomerId is null ? Model.Brief.Customer + " (legacy — keep current)" : "Select customer")</option>@foreach(var customer in Model.Customers){<option value="@customer.Id" data-default-country="@customer.DefaultCountryId">@customer.Name</option>}@if(Model.Brief.CustomerId.HasValue && !Model.Customers.Any(x=>x.Id==Model.Brief.CustomerId)){<option value="@Model.Brief.CustomerId">@Model.Brief.Customer (inactive — keep current)</option>}</select><span asp-validation-for="Brief.CustomerId"></span></div>
 <div class="field"><label asp-for="Brief.CountryId"></label><select asp-for="Brief.CountryId" class="form-select" required><option value="">Select country</option>@foreach(var country in Model.Countries){<option value="@country.Id">@country.Name</option>}</select><span asp-validation-for="Brief.CountryId"></span><small>Customer default is a suggestion. You can choose another country.</small></div>
 </div>
+<div class="field mt-3"><label for="briefFiles">Brief attachments (optional)</label><input id="briefFiles" name="briefFiles" type="file" multiple accept=".xlsx,.xlsm,.xls" class="form-control"/><small>Excel files are uploaded when you choose Next and attached when you save the draft.</small></div>
+@if(Model.Draft.TemporaryBriefs.Count>0){<ul>@foreach(var file in Model.Draft.TemporaryBriefs){<li>@file.FileName — @file.Size.ToString("N0") bytes (ready to save)</li>}</ul>}
 <div class="form-actions"><a asp-action="Index" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary" type="submit">Next →</button></div>
 </form>
 }
@@ -43,7 +45,7 @@
 <div class="field"><label asp-for="Product.Quantity"></label><input asp-for="Product.Quantity" class="form-control" type="number" min="1" max="2147483647" step="1" required /><span asp-validation-for="Product.Quantity"></span></div>
 <div class="field"><label asp-for="Product.EstimatedValue"></label><div class="input-group"><input asp-for="Product.EstimatedValue" class="form-control decimal-input" type="text" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" /><span class="input-group-text">PLN</span></div><span asp-validation-for="Product.EstimatedValue"></span></div>
 <div class="field"><label asp-for="Product.EstimatedMargin"></label><div class="input-group"><input asp-for="Product.EstimatedMargin" class="form-control decimal-input" type="text" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" /><span class="input-group-text">%</span></div><span asp-validation-for="Product.EstimatedMargin"></span></div>
-<div class="field"><label asp-for="Product.FormulaStatus"></label><select asp-for="Product.FormulaStatus" asp-items="Html.GetEnumSelectList<FormulaStatus>()" class="form-select" required><option value="">Select formula</option></select><span asp-validation-for="Product.FormulaStatus"></span></div>
+<div class="field"><label asp-for="Product.FormulaOptionId"></label><select asp-for="Product.FormulaOptionId" class="form-select" required="@(!Model.Product.PersistedId.HasValue || Model.Product.FormulaOptionId.HasValue)"><option value="">@(Model.Product.PersistedId.HasValue && !Model.Product.FormulaOptionId.HasValue ? "Keep legacy formula" : "Select formula")</option>@foreach(var formula in Model.FormulaOptions){<option value="@formula.Id">@formula.Name</option>}@if(Model.Product.PersistedId.HasValue && Model.Product.FormulaOptionId.HasValue && !Model.FormulaOptions.Any(x=>x.Id==Model.Product.FormulaOptionId)){<option value="@Model.Product.FormulaOptionId">@Model.Product.FormulaName (inactive — keep current)</option>}</select><span asp-validation-for="Product.FormulaOptionId"></span></div>
 </div>
 <div class="form-actions"><a class="btn btn-outline-secondary" asp-action="Wizard" asp-route-token="@Model.Token" asp-route-step="2">Cancel product edit</a><button type="submit" class="btn btn-primary">Save product</button></div>
 </form>
@@ -71,7 +73,7 @@ else {<button class="btn btn-primary" disabled>Continue to Summary →</button>}
 @if (Model.Step == 3)
 {
 <section class="panel form-panel"><p class="eyebrow">BRIEF</p><h2>Ready to save your draft</h2><dl class="brief-grid"><div><dt>Customer</dt><dd>@Model.Draft.Brief.Customer</dd></div><div><dt>Country</dt><dd>@(Model.Countries.FirstOrDefault(x=>x.Id==Model.Draft.Brief.CountryId)?.Name ?? "Country unavailable")</dd></div><div><dt>Project Manager</dt><dd>@Model.ProjectManager</dd></div></dl></section>
-<div class="section-heading"><h2>Products</h2><span class="subtle-badge">Pending review</span></div>
+<div class="section-heading"><h2>Products</h2><span class="subtle-badge">Draft products</span></div>
 <div class="product-grid">
 @foreach(var product in Model.Draft.Products)
 {

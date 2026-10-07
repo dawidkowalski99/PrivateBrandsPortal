@@ -184,7 +184,7 @@ public sealed class ApprovalTests
         var id = await Submitted(owner); await Manager(manager);
         var input = await Input(manager, id, ReviewDecision.EditedAndApproved);
         input.Product!.ProductCategoryId = 3; input.Product.ProductSubcategoryId = (await CustomerSubcategoryTests.Subcategory(owner,3)).Id; input.Product.SKU = "changed"; input.Product.Quantity = 7;
-        input.Product.EstimatedValue = 12.34m; input.Product.EstimatedMargin = 10; input.Product.FormulaStatus = FormulaStatus.NewFormula;
+        input.Product.EstimatedValue = 12.34m; input.Product.EstimatedMargin = 10; input.Product.FormulaOptionId = DictionaryFixture.NewFormulaId;
         await Service(manager).DecideAsync(input);
         Assert.Equal(8, (await owner.Projects.DetailsAsync(id))!.Products[0].Changes.Count);
     }

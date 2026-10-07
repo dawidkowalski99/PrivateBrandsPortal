@@ -37,6 +37,7 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
         await db.Entry(product).ReloadAsync(ct);
         if(product.ReviewStatus is not (ProductReviewStatus.Approved or ProductReviewStatus.EditedAndApproved) || product.CommercialStatus==CommercialStatus.SalesAndDelivery)
             throw new ValidationException("Only accepted, unfinished products can be updated.");
+        if(input.Status==CommercialStatus.SalesAndDelivery) await AttachmentService.RequireSalesDocumentsAsync(db,input.ProjectId,input.ProductId,ct);
         if(product.CommercialStatus==input.Status) { await tx.RollbackAsync(ct); return; }
         db.AuditLogs.Add(new AuditLog { EntityType=nameof(ProjectProduct),EntityId=product.Id,FieldName=nameof(ProjectProduct.CommercialStatus),
             OldValue=product.CommercialStatus?.ToString(),NewValue=input.Status!.Value.ToString(),ChangedByUserId=owner,ChangedAtUtc=now,ChangeType=AuditChangeType.Updated });

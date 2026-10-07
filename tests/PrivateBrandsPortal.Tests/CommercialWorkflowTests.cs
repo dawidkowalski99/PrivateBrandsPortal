@@ -25,8 +25,17 @@ public sealed class CommercialWorkflowTests
         input.RejectionReasonId=reason;if(reason==10)input.Comment="Test reason";
         await Review(s).DecideAsync(input);
     }
+    // Existing success-path fixtures now include the newly required document metadata.
+    internal static async Task SupplyDocuments(ProjectSqlTests.Scope s,int id) {
+        var actor=(await s.Users.GetCurrentAsync()).Id;
+        foreach(var type in new[]{AttachmentType.Offer,AttachmentType.Calculation})
+            if(!await s.Db.ProjectAttachments.AnyAsync(x=>x.ProjectId==id && x.AttachmentType==type && x.DeletedAtUtc==null && x.ProjectProductId==null))
+                s.Db.ProjectAttachments.Add(new ProjectAttachment{ProjectId=id,AttachmentType=type,OriginalFileName="Fixture.xlsx",StorageKey=$"projects/{id}/{Guid.NewGuid():N}.xlsx",ContentType="application/octet-stream",FileSize=1,UploadedByUserId=actor,UploadedAtUtc=DateTimeOffset.UtcNow});
+        await s.Db.SaveChangesAsync();
+    }
     internal static async Task Status(ProjectSqlTests.Scope s,int id,int index,CommercialStatus status)
     {
+        if(status==CommercialStatus.SalesAndDelivery) await SupplyDocuments(s,id);
         var product=(await s.Projects.DetailsAsync(id))!.Products[index];
         var form=(await Commercial(s).FormAsync(id,product.Id,default))!;form.Input.Status=status;
         await Commercial(s).UpdateAsync(form.Input);

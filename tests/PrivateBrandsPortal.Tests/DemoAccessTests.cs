@@ -107,7 +107,7 @@ public sealed class DemoAccessTests
         Assert.Null(await reviews.FormAsync(id, final.Products[0].Id, ReviewDecision.Approved));
         Assert.Equal(AppRole.ProjectManager, (await s.Users.GetCurrentAsync()).Role);
         Assert.Contains(await s.Projects.ListAsync(), x => x.Id == id);
-        Assert.Equal(13, s.Db.Model.GetEntityTypes().Count()); // No downstream task model.
+        Assert.Equal(15, s.Db.Model.GetEntityTypes().Count()); // No downstream task model.
         if (second == ReviewDecision.EditedAndApproved) Assert.Single(final.Products[1].Changes);
         // Backend uses the same gate as policies, even if a caller skips HTTP authorization.
         var disabled = new ApprovalService(s.Db, s.Users, TimeProvider.System, Access("Production", configured: s.Login, login: s.Login));

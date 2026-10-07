@@ -37,12 +37,12 @@ public sealed class ProductCopyService(ApplicationDbContext db, IAppUserService 
             ProductSubcategoryId = source.ProductSubcategoryId,
             Subcategory = source.Subcategory ?? source.ProductType?.Name ?? "", SKU = "",
             Quantity = source.Quantity, EstimatedValue = source.EstimatedValue,
-            EstimatedMargin = source.EstimatedMargin, FormulaStatus = source.FormulaStatus
+            EstimatedMargin = source.EstimatedMargin, FormulaOptionId=source.FormulaOptionId, FormulaStatus = source.FormulaStatus
         };
     }
     public static ProductInput Duplicate(ProductInput source) => new() {
         ProductCategoryId = source.ProductCategoryId, ProductSubcategoryId = source.ProductSubcategoryId, Subcategory = source.Subcategory, SKU = "",
         Quantity = source.Quantity, EstimatedValue = source.EstimatedValue,
-        EstimatedMargin = source.EstimatedMargin, FormulaStatus = source.FormulaStatus
+        EstimatedMargin = source.EstimatedMargin, FormulaOptionId=source.FormulaOptionId, FormulaStatus = source.FormulaStatus
     };
 }

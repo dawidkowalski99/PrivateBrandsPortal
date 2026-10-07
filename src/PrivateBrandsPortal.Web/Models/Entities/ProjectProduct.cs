@@ -7,6 +7,8 @@ public sealed class ProjectProduct
     public int? ProductSubcategoryId { get; set; }
     public ProductSubcategory? ProductSubcategory { get; set; }
     public int Id { get; set; }
+    public int? FormulaOptionId { get; set; }
+    public FormulaOption? FormulaOption { get; set; }
     public int ProjectId { get; set; }
     public Project Project { get; set; } = null!;
     public int? ProductTypeId { get; set; }

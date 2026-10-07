@@ -66,7 +66,7 @@ public sealed class ReportTests
     [Fact]
     public async Task Pagination_keeps_global_totals_and_export_includes_all_rows()
     {
-        await using var s=new ProjectSqlTests.Scope();var draft=WizardTests.ValidDraft();var template=draft.Products[0];draft.Products=Enumerable.Range(1,55).Select(i=>new ProductInput{ProductCategoryId=1,ProductSubcategoryId=DictionaryFixture.ShampooId,Subcategory="Shampoo",SKU="PAGE-"+i,Quantity=1,EstimatedValue=12.34m,EstimatedMargin=10,FormulaStatus=FormulaStatus.ReadyToGo}).ToList();await s.Projects.SaveDraftAsync(draft);
+        await using var s=new ProjectSqlTests.Scope();var draft=WizardTests.ValidDraft();var template=draft.Products[0];draft.Products=Enumerable.Range(1,55).Select(i=>new ProductInput{ProductCategoryId=1,ProductSubcategoryId=DictionaryFixture.ShampooId,Subcategory="Shampoo",SKU="PAGE-"+i,Quantity=1,EstimatedValue=12.34m,EstimatedMargin=10,FormulaOptionId=DictionaryFixture.ReadyFormulaId,FormulaStatus=FormulaStatus.ReadyToGo}).ToList();await s.Projects.SaveDraftAsync(draft);
         var f=new ReportFilter{ProjectManagerId=(await s.Users.GetCurrentAsync()).Id};var first=await Reports(s).GetAsync(f);f.Page=2;var second=await Reports(s).GetAsync(f);
         Assert.Equal(50,first.Rows.Count);Assert.Equal(5,second.Rows.Count);Assert.Equal(55,second.Totals.SKUs);Assert.Equal(1,second.Totals.Projects);
         using var stream=new MemoryStream();await ReportCsv.WriteAsync(stream,await Reports(s).ExportAsync(f),default);Assert.Equal(56,Encoding.UTF8.GetString(stream.ToArray()).Split('\n',StringSplitOptions.RemoveEmptyEntries).Length);

@@ -86,8 +86,9 @@ public sealed class ProjectTransferTests
     public async Task Transfer_preserves_review_commercial_and_archive_and_new_owner_can_continue(bool archived)
     {
         await using var s = new ProjectSqlTests.Scope(); await using var next = new ProjectSqlTests.Scope();
-        await Authorize(s); var target = await next.Users.GetCurrentAsync();
+        var target = await next.Users.GetCurrentAsync();
         var id = await CommercialWorkflowTests.Submitted(s);
+        await Authorize(s);
         await CommercialWorkflowTests.Decide(s, id, 0, ReviewDecision.Approved);
         await CommercialWorkflowTests.Decide(s, id, 1, ReviewDecision.Rejected, 7);
         await CommercialWorkflowTests.Status(s, id, 0, archived ? CommercialStatus.SalesAndDelivery : CommercialStatus.PriceOfferSubmitted);
@@ -125,7 +126,7 @@ public sealed class ProjectTransferTests
     }
     [Theory]
     [InlineData("inactive")]
-    [InlineData("manager")]
+    [InlineData("inactive manager")]
     [InlineData("missing")]
     [InlineData("same")]
     [InlineData("reason")]
@@ -137,7 +138,7 @@ public sealed class ProjectTransferTests
         var actor = await Authorize(s); var target = await next.Users.GetCurrentAsync();
         var id = await s.Projects.SaveDraftAsync(WizardTests.ValidDraft()); var input = await Input(s, id, target.Id);
         if (kind == "inactive") await s.Db.AppUsers.Where(x => x.Id == target.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.IsActive, false));
-        if (kind == "manager") await s.Db.AppUsers.Where(x => x.Id == target.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.Role, AppRole.Manager));
+        if (kind == "inactive manager") await s.Db.AppUsers.Where(x => x.Id == target.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.Role, AppRole.Manager).SetProperty(p=>p.IsActive,false));
         if (kind == "missing") input.NewProjectManagerId = int.MaxValue;
         if (kind == "same") input.NewProjectManagerId = actor.Id;
         if (kind == "reason") input.Reason = "  ";
@@ -146,7 +147,7 @@ public sealed class ProjectTransferTests
         await Assert.ThrowsAsync<ValidationException>(() => Service(s).TransferAsync(input));
         Assert.Equal(actor.Id, await s.Db.Projects.Where(x => x.Id == id).Select(x => x.ProjectManagerId).SingleAsync());
         Assert.False(await s.Db.AuditLogs.AnyAsync(x => x.EntityId == id && x.ChangeType == AuditChangeType.ProjectReassigned));
-        if (kind is "inactive" or "manager") Assert.DoesNotContain((await Service(s).FormAsync(id, default))!.ProjectManagers, x => x.Id == target.Id);
+        if (kind is "inactive" or "inactive manager") Assert.DoesNotContain((await Service(s).FormAsync(id, default))!.ProjectManagers, x => x.Id == target.Id);
     }
     [Theory]
     [InlineData(false)]

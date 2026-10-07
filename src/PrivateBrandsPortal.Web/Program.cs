@@ -19,6 +19,13 @@ builder.Services.Configure<RequestLocalizationOptions>(o =>
 builder.Services.AddScoped<IAppUserService, AppUserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection("FileStorage"));
+builder.Services.AddSingleton<IFileStorage, FileStorage>();
+builder.Services.AddScoped<AttachmentService>();
+var maxUploadBytes=builder.Configuration.GetValue<int?>("FileStorage:MaxFileSizeMb") ?? 25;
+var maxRequestBytes=checked((long)Math.Clamp(maxUploadBytes,1,1024)*1024*1024*10+1024*1024);
+builder.WebHost.ConfigureKestrel(o=>o.Limits.MaxRequestBodySize=maxRequestBytes);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o=>o.MultipartBodyLengthLimit=maxRequestBytes);
 builder.Services.AddScoped<CommercialService>();
 builder.Services.AddScoped<DictionaryService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
@@ -45,6 +52,14 @@ builder.Services.AddScoped<IProjectNumberGenerator, ProjectNumberGenerator>();
 builder.Services.AddExceptionHandler<PortalExceptionHandler>();
 
 var app = builder.Build();
+if (args.Contains("--cleanup-temp-attachments", StringComparer.Ordinal))
+{
+    var storage = app.Services.GetRequiredService<IFileStorage>();
+    var removed = await storage.CleanupTemporaryAsync(DateTimeOffset.UtcNow.AddHours(-24), CancellationToken.None);
+    app.Logger.LogInformation("Removed {Count} expired temporary attachments.", removed);
+    await app.DisposeAsync();
+    return;
+}
 app.UseExceptionHandler("/Home/Error");
 if (!app.Environment.IsDevelopment())
 {
