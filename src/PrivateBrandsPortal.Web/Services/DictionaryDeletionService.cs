@@ -32,7 +32,7 @@ public sealed class DictionaryDeletionService(ApplicationDbContext db,IAppUserSe
             DictionaryKind.ProductSubcategories=>await db.ProjectProducts.AnyAsync(x=>x.ProductSubcategoryId==id || x.Subcategory==model.Name,ct)||await db.AuditLogs.AnyAsync(x=>(x.FieldName=="ProductSubcategoryId" && (x.OldValue==id.ToString()||x.NewValue==id.ToString())) || (x.FieldName=="Subcategory" && (x.OldValue==model.Name||x.NewValue==model.Name)),ct),
             DictionaryKind.RejectionReasons=>await db.ProductReviews.AnyAsync(x=>x.RejectionReasonId==id || x.RejectionReasonName==model.Name,ct),
             DictionaryKind.FormulaOptions=>await db.ProjectProducts.AnyAsync(x=>x.FormulaOptionId==id,ct)||await db.AuditLogs.AnyAsync(x=>x.FieldName=="Formula" && (x.OldValue==model.Name||x.NewValue==model.Name),ct),
-            DictionaryKind.CustomerRejectionReasons=>await db.Projects.AnyAsync(x=>x.CustomerRejectionReasonId==id,ct),_=>true};
+            DictionaryKind.CustomerRejectionReasons=>await db.Projects.AnyAsync(x=>x.CustomerRejectionReasonId==id,ct)||await db.ProjectProducts.AnyAsync(x=>x.CustomerRejectionReasonId==id,ct),_=>true};
         if(used)throw new ValidationException(UsedMessage);
         db.Remove((await db.FindAsync(EntityType(kind),[id],ct))!);
         db.AuditLogs.Add(new(){EntityType=EntityType(kind).Name,EntityId=id,FieldName="DictionaryValueDeleted",OldValue=System.Text.Json.JsonSerializer.Serialize(new{DictionaryType=kind.ToString(),model.Name}),ChangedByUserId=actor.Id,ChangedAtUtc=clock.GetUtcNow(),ChangeType=AuditChangeType.Deleted});

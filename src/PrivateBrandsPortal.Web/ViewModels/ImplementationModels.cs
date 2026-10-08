@@ -23,14 +23,18 @@ public sealed record ImplementationQueueItem(int Id,int ProjectId,string Project
 public sealed class CustomerClosureInput
 {
     [Range(1,int.MaxValue)]public int ProjectId {get;set;}
+    [Range(1,int.MaxValue)]public int ProductId {get;set;}
     [Required]public DateTimeOffset? Version {get;set;}
     [Required,Range(1,int.MaxValue),Display(Name="Reason")]public int? ReasonId {get;set;}
     [StringLength(1000)]public string? Comment {get;set;}
-    [Range(typeof(bool),"true","true",ErrorMessage="Confirm closing the entire project.")]public bool Confirm {get;set;}
+    [Range(typeof(bool),"true","true",ErrorMessage="Confirm closing this product.")]public bool Confirm {get;set;}
 }
 public sealed class CustomerClosureModel
 {
     public string ProjectNumber {get;set;}="";
+    public string SKU {get;set;}="";
     public CustomerClosureInput Input {get;set;}=new();
     public IReadOnlyList<LookupItem> Reasons {get;set;}=[];
 }
+
+public sealed record CustomerClosureResult(string Reason,bool Archived);

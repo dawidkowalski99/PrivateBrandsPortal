@@ -3,8 +3,9 @@
 @if(Model.ReviewStatus is ProductReviewStatus.Approved or ProductReviewStatus.EditedAndApproved){
 <section class="manager-changes"><h4>PM Status</h4>
 @if(Model.CommercialStatus==CommercialStatus.SalesAndDelivery){<span class="stage-badge project-status-Approved">Completed</span>}
+@if(Model.CommercialStatus==CommercialStatus.CustomerNotApproved){<span class="stage-badge">Closed — rejected by Customer</span><p>@Model.CustomerRejectionReason</p><p>@Model.CustomerRejectionComment</p><small>@Model.CustomerRejectedBy · @Model.CustomerRejectedAtUtc?.ToString("dd.MM.yyyy HH:mm") UTC</small>}
 <p>@(Model.CommercialStatus.HasValue ? EnumLabel.Text(Model.CommercialStatus.Value) : "Awaiting PM update")</p>
-@if(Model.CommercialStatus!=CommercialStatus.SalesAndDelivery && ViewData["ReadOnly"] is not true && ViewData["Archived"] is not true){<a class="btn btn-outline-secondary" asp-controller="Commercial" asp-action="Change" asp-route-projectId="@ViewData["ProjectId"]" asp-route-productId="@Model.Id">Change status</a>}
+@if(Model.CommercialStatus is not (CommercialStatus.SalesAndDelivery or CommercialStatus.CustomerNotApproved) && ViewData["ReadOnly"] is not true && ViewData["Archived"] is not true){<a class="btn btn-outline-secondary" asp-controller="Commercial" asp-action="Change" asp-route-projectId="@ViewData["ProjectId"]" asp-route-productId="@Model.Id">Change status</a>}
 <partial name="_ImplementationHistory" model="Model"/>
 @if(Model.CommercialStatus==CommercialStatus.ImplementationIntoProduction && ViewData["ReadOnly"] is not true && ViewData["Archived"] is not true && (Model.ImplementationHistory.Count==0 || Model.ImplementationHistory.Last().Status==ImplementationApprovalStatus.Rejected)){
 <form method="post" asp-controller="Implementation" asp-action="Resubmit"><input type="hidden" name="projectId" value="@ViewData["ProjectId"]"/><input type="hidden" name="productId" value="@Model.Id"/><input type="hidden" name="version" value="@(((DateTimeOffset?)ViewData["ProjectVersion"])?.ToString("O"))"/><button class="btn btn-outline-primary mt-3">Submit for implementation approval</button></form>}

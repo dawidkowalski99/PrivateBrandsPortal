@@ -1062,12 +1062,19 @@ Sales & Delivery requires the latest attempt to be Approved and revalidates acti
 documents in the same transaction. Parent project version checks serialize concurrent
 workflow actions. Existing archived deliveries are unaffected.
 
-Project not approved by Customer is an explicitly confirmed, owner-only project
-closure. An active dictionary reason is required; its name, comment, actor and UTC
-timestamp are saved as historical metadata. Accepted unfinished SKUs are closed;
-delivered SKUs and original reviews are preserved. The project becomes Cancelled
-and archived. Archive distinguishes completed delivery from customer rejection.
-Reports and CSV include implementation approval and customer rejection reason.
+Rejected by Customer is an explicitly confirmed, owner-only operation on one SKU.
+An active reason is required; its name, comment, actor and UTC timestamp are saved on
+ProjectProduct. Other products, documents and approval histories remain unchanged.
+Both Sales & Delivery and CustomerNotApproved are terminal commercial statuses.
+A project is archived once all its products are terminal (delivered, rejected by
+Customer, or rejected during initial Manager Review); a pending/active sibling keeps
+it active. Archive supports positive, negative and mixed outcomes. Existing initial
+Manager-only rejection handling is unchanged. Historical whole-project closures
+retain their original metadata and are not rewritten.
+
+Migration 20261007180815_ProductCustomerRejection adds nullable per-product rejection
+metadata and non-cascading references. Reports read the product reason, with the
+legacy project reason as a fallback.
 
 Only active Managers and SuperAdmins may permanently delete unused dictionary
 values. Manage dictionaries permission alone is insufficient. A confirmation page,
@@ -1076,5 +1083,5 @@ foreign keys protect used values. Used entries must be deactivated instead.
 Dictionary deletions, implementation requests/decisions/resubmissions and customer
 closure have audit entries.
 
-Successful delivery and customer closure use single-use TempData UI feedback.
-Effects do not block interaction and respect prefers-reduced-motion.
+Successful delivery and product rejection use single-use WorkflowUiEvent TempData feedback.
+The two events are SalesAndDeliveryCompleted and CustomerRejected. Effects start only on a visible page after successful POST/Redirect, last about 2.2 seconds, do not repeat on refresh, do not block interaction or create scrollbars, and respect prefers-reduced-motion.

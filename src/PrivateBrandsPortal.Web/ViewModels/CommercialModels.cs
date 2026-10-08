@@ -16,4 +16,8 @@ public sealed class CommercialForm
     public CommercialInput Input { get; set; } = new();
 }
 public sealed record ArchiveItem(int Id, string ProjectNumber, string Customer, string Country,
-    string ProjectManager, int Products, int Completed, DateTimeOffset? ArchivedAtUtc,string? CustomerRejectionReason=null);
+    string ProjectManager, int Products, int Completed, DateTimeOffset? ArchivedAtUtc,string? CustomerRejectionReason=null,int CustomerRejected=0)
+{
+    public string Outcome=>CustomerRejectionReason is not null?"Historical customer closure":
+        CustomerRejected==0?"Completed — Sales & Delivery":Completed>0?"Completed — mixed outcome":"Closed — rejected by Customer";
+}

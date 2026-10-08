@@ -7,6 +7,13 @@ public sealed class ProjectProduct
     public ICollection<ImplementationApproval> ImplementationApprovals {get;set;} = new List<ImplementationApproval>();
     public int? ProductSubcategoryId { get; set; }
     public ProductSubcategory? ProductSubcategory { get; set; }
+    public int? CustomerRejectionReasonId {get;set;}
+    public CustomerRejectionReason? CustomerRejectionReason {get;set;}
+    public string? CustomerRejectionReasonName {get;set;}
+    public string? CustomerRejectionComment {get;set;}
+    public DateTimeOffset? CustomerRejectedAtUtc {get;set;}
+    public int? CustomerRejectedByUserId {get;set;}
+    public AppUser? CustomerRejectedByUser {get;set;}
     public int Id { get; set; }
     public int? FormulaOptionId { get; set; }
     public FormulaOption? FormulaOption { get; set; }

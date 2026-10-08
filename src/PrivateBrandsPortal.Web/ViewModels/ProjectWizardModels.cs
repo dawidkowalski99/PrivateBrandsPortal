@@ -105,6 +105,7 @@ public sealed class ProjectDetailsViewModel
 public sealed record ProductCardViewModel(string ProductType, string SKU, int Quantity,
     decimal EstimatedValue, decimal EstimatedMargin, FormulaStatus FormulaStatus)
 {
+    public string? CustomerRejectionReason {get;init;} public string? CustomerRejectionComment {get;init;} public string? CustomerRejectedBy {get;init;} public DateTimeOffset? CustomerRejectedAtUtc {get;init;}
     public List<ImplementationHistory> ImplementationHistory {get;init;} = [];
     public int? FormulaOptionId { get; init; }
     public string? FormulaName { get; init; }

@@ -11,7 +11,7 @@ public sealed class CommercialController(CommercialService service) : Controller
     { var model=await service.FormAsync(projectId,productId,ct); return model is null ? NotFound() : View(model); }
     [HttpPost] public async Task<IActionResult> Change([Bind(Prefix="Input")] CommercialInput input,CancellationToken ct)
     {
-        if(ModelState.IsValid) try { await service.UpdateAsync(input,ct); TempData["Success"]=input.Status==PrivateBrandsPortal.Web.Models.Enums.CommercialStatus.SalesAndDelivery ? "Sales & Delivery completed" : "Commercial status updated."; if(input.Status==PrivateBrandsPortal.Web.Models.Enums.CommercialStatus.SalesAndDelivery)TempData["WorkflowEvent"]="delivered"; return RedirectToAction("Details","Projects",new{id=input.ProjectId}); }
+        if(ModelState.IsValid) try { await service.UpdateAsync(input,ct); TempData["Success"]=input.Status==PrivateBrandsPortal.Web.Models.Enums.CommercialStatus.SalesAndDelivery ? "Sales & Delivery completed" : "Commercial status updated."; if(input.Status==PrivateBrandsPortal.Web.Models.Enums.CommercialStatus.SalesAndDelivery)TempData[WorkflowUiEvents.Key]=WorkflowUiEvents.SalesAndDeliveryCompleted; return RedirectToAction("Details","Projects",new{id=input.ProjectId}); }
         catch(ValidationException ex){ ModelState.AddModelError("",ex.Message); }
         var model=await service.FormAsync(input.ProjectId,input.ProductId,ct); if(model is null) return NotFound();
         model.Input=input; return View(model);
