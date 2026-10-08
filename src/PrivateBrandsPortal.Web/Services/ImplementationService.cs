@@ -18,7 +18,7 @@ public sealed class ImplementationService(ApplicationDbContext db,IAppUserServic
     {
         var user=await Reviewer(ct);
         return await db.ImplementationApprovals.AsNoTracking().Where(x=>x.Status==ImplementationApprovalStatus.Pending &&
-            x.ProjectProduct.CommercialStatus==CommercialStatus.ImplementationIntoProduction && x.ProjectProduct.Project.ArchivedAtUtc==null && x.ProjectProduct.Project.ProjectManagerId!=user.Id)
+            x.ProjectProduct.CommercialStatus==CommercialStatus.ImplementationIntoProduction && x.ProjectProduct.Project.ArchivedAtUtc==null && (user.Role==AppRole.SuperAdmin || x.ProjectProduct.Project.ProjectManagerId!=user.Id))
             .OrderBy(x=>x.RequestedAtUtc).Select(x=>new ImplementationQueueItem(x.Id,x.ProjectProduct.ProjectId,x.ProjectProduct.Project.ProjectNumber,
                 x.ProjectProduct.Project.Customer,x.ProjectProduct.Project.ProjectManager.DisplayName,
                 x.ProjectProduct.ProductCategory==null?null:x.ProjectProduct.ProductCategory.Name,x.ProjectProduct.Subcategory,x.ProjectProduct.SKU,x.RequestedAtUtc,
@@ -36,7 +36,7 @@ public sealed class ImplementationService(ApplicationDbContext db,IAppUserServic
             ((x.AttachmentType==AttachmentType.Offer && x.ProjectProductId==null) || (x.AttachmentType==AttachmentType.Calculation && (x.ProjectProductId==null||x.ProjectProductId==approval.ProjectProductId))))
             .Select(x=>new AttachmentItem(x.Id,x.AttachmentType,x.OriginalFileName,x.FileSize,x.UploadedByUser.DisplayName,x.UploadedAtUtc,x.ProjectProduct==null?null:x.ProjectProduct.SKU,x.Description,null,null,null)).ToListAsync(ct);
         return new(){Project=project,Product=project.Products.Single(x=>x.Id==approval.ProjectProductId),Documents=docs,
-            Input=new(){Id=id,Version=project.UpdatedAtUtc},CanDecide=project.ProjectManagerId!=user.Id && project.ArchivedAtUtc==null && approval.Status==ImplementationApprovalStatus.Pending && approval.ProjectProduct.CommercialStatus==CommercialStatus.ImplementationIntoProduction};
+            Input=new(){Id=id,Version=project.UpdatedAtUtc},CanDecide=(user.Role==AppRole.SuperAdmin || project.ProjectManagerId!=user.Id) && project.ArchivedAtUtc==null && approval.Status==ImplementationApprovalStatus.Pending && approval.ProjectProduct.CommercialStatus==CommercialStatus.ImplementationIntoProduction};
     }
     public async Task DecideAsync(ImplementationDecisionInput input,CancellationToken ct)
     {
@@ -46,7 +46,7 @@ public sealed class ImplementationService(ApplicationDbContext db,IAppUserServic
         var projectId=await db.ImplementationApprovals.Where(x=>x.Id==input.Id).Select(x=>(int?)x.ProjectProduct.ProjectId).SingleOrDefaultAsync(ct);
         if(projectId is null)throw new PortalAccessException();
         await using var tx=await db.Database.BeginTransactionAsync(ct);var now=clock.GetUtcNow();if(now<=input.Version)now=input.Version!.Value.AddTicks(1);
-        if(await db.Projects.Where(x=>x.Id==projectId && x.ProjectManagerId!=user.Id && x.ArchivedAtUtc==null && x.UpdatedAtUtc==input.Version)
+        if(await db.Projects.Where(x=>x.Id==projectId && (user.Role==AppRole.SuperAdmin || x.ProjectManagerId!=user.Id) && x.ArchivedAtUtc==null && x.UpdatedAtUtc==input.Version)
             .ExecuteUpdateAsync(s=>s.SetProperty(x=>x.UpdatedAtUtc,now),ct)!=1)throw new ValidationException("Project changed, closed, or belongs to you. Reopen review.");
         var approval=await db.ImplementationApprovals.Include(x=>x.ProjectProduct).SingleAsync(x=>x.Id==input.Id,ct);await db.Entry(approval).ReloadAsync(ct);await db.Entry(approval.ProjectProduct).ReloadAsync(ct);
         if(approval.Status!=ImplementationApprovalStatus.Pending || approval.ProjectProduct.CommercialStatus!=CommercialStatus.ImplementationIntoProduction)throw new ValidationException("This request is no longer pending.");

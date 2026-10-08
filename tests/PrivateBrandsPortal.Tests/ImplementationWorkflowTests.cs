@@ -51,14 +51,27 @@ public sealed class ImplementationWorkflowTests
         Assert.Equal(CommercialStatus.SalesAndDelivery,(await s.Projects.DetailsAsync(id))!.Products[0].CommercialStatus);
         Assert.True(await s.Db.AuditLogs.AnyAsync(x=>x.EntityId==sales.ProductId && x.FieldName=="ImplementationApproved"));
     }
-    [Theory]
-    [InlineData(AppRole.Manager)]
-    [InlineData(AppRole.SuperAdmin)]
-    public async Task Own_project_cannot_be_approved_even_by_superadmin(AppRole role){
-        await using var s=new ProjectSqlTests.Scope();var id=await Accepted(s);var input=await Request(s,id);await SetRole(s,role);
+    [Fact]
+    public async Task Manager_cannot_approve_own_project(){
+        await using var s=new ProjectSqlTests.Scope();var id=await Accepted(s);var input=await Request(s,id);await SetRole(s,AppRole.Manager);
         await Assert.ThrowsAsync<ValidationException>(()=>Service(s).DecideAsync(input,default));
         Assert.DoesNotContain(await Service(s).QueueAsync(default),x=>x.Id==input.Id);
         Assert.False((await Service(s).ReviewAsync(input.Id,default))!.CanDecide);
+    }
+    [Fact]
+    public async Task Superadmin_can_review_own_project_and_then_deliver(){
+        await using var s=new ProjectSqlTests.Scope();var id=await Accepted(s);var input=await Request(s,id);await SetRole(s,AppRole.SuperAdmin);
+        Assert.Contains(await Service(s).QueueAsync(default),x=>x.Id==input.Id);
+        Assert.True((await Service(s).ReviewAsync(input.Id,default))!.CanDecide);
+        await Service(s).DecideAsync(input,default);
+        var actor=await s.Users.GetCurrentAsync();
+        var approval=await s.Db.ImplementationApprovals.AsNoTracking().SingleAsync(x=>x.Id==input.Id);
+        Assert.Equal(ImplementationApprovalStatus.Approved,approval.Status);
+        Assert.Equal(actor.Id,approval.ReviewerId);
+        var p=(await s.Projects.DetailsAsync(id))!;
+        await CommercialWorkflowTests.Commercial(s).UpdateAsync(new(){ProjectId=id,ProductId=p.Products[0].Id,Version=p.UpdatedAtUtc,Status=CommercialStatus.SalesAndDelivery});
+        Assert.Equal(CommercialStatus.SalesAndDelivery,(await s.Projects.DetailsAsync(id))!.Products[0].CommercialStatus);
+        Assert.DoesNotContain(await Service(s).QueueAsync(default),x=>x.Id==input.Id);
     }
     [Fact]
     public async Task Project_manager_cannot_review_and_foreign_owner_cannot_resubmit(){

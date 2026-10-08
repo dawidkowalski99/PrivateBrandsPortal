@@ -1052,8 +1052,7 @@ are inserted once by this migration and remain editable afterwards.
 An accepted SKU needs an active project Offer and a Calculation assigned either to
 the project or to that exact SKU before entering Implementation into Production.
 Entry creates a Pending implementation approval. Approvals → Implementation Approvals
-is available to active Managers and SuperAdmins. The current project owner cannot
-approve their own implementation, including a SuperAdmin owner. This decision is
+is available to active Managers and SuperAdmins. Managers cannot approve their own implementation. SuperAdmins may approve their own implementation with the same document and audit requirements. This decision is
 separate from the initial product review and never uses Development demo access.
 
 Rejection requires a comment and leaves the SKU in Implementation. The owner can

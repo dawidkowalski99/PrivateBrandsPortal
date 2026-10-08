@@ -1,8 +1,15 @@
 @model ImplementationReviewModel
 @{ViewData["Title"]="Implementation Review";}
 <div class="page-heading"><div><p class="eyebrow">@Model.Project.ProjectNumber · @Model.Project.Customer</p><h1>Implementation Review</h1><p>Project Manager: @Model.Project.ProjectManager</p></div></div>
-<section class="panel form-panel"><partial name="~/Views/Projects/_ProductData.cshtml" model="Model.Product"/></section>
+<section class="panel form-panel" aria-labelledby="implementation-brief-heading">
+    <h2 id="implementation-brief-heading">Brief</h2>
+    <dl class="product-data">
+        <div><dt>Customer</dt><dd>@Model.Project.Customer</dd></div>
+        <div><dt>Country</dt><dd>@Model.Project.Country</dd></div>
+    </dl>
+</section>
+<section class="panel form-panel mt-4"><partial name="~/Views/Projects/_ProductData.cshtml" model="Model.Product"/></section>
 <section class="panel form-panel mt-4"><h2>Offer &amp; Calculation for this SKU</h2>@foreach(var file in Model.Documents){<p><strong>@file.Type</strong> · @(file.SKU??"Whole project") · <a asp-controller="Attachments" asp-action="Download" asp-route-id="@file.Id">@file.FileName — Download</a></p>}</section>
 <partial name="_ImplementationHistory" model="Model.Product"/>
-@if(Model.CanDecide){<form method="post" class="panel form-panel mt-4"><div asp-validation-summary="All" class="validation-summary"></div><input asp-for="Input.Id" type="hidden"/><input type="hidden" name="Input.Version" value="@Model.Input.Version?.ToString("O")"/><div class="field"><label asp-for="Input.Comment">Comment (required for rejection)</label><textarea asp-for="Input.Comment" maxlength="1000" class="form-control"></textarea></div><div class="form-actions"><button name="Input.Decision" value="Approved" class="btn btn-primary">Approve</button><button name="Input.Decision" value="Rejected" class="btn btn-outline-danger">Reject</button></div></form>}else{<p class="alert alert-info">Read only. You cannot approve your own project or a completed request.</p>}
+@if(Model.CanDecide){<form method="post" class="panel form-panel mt-4"><div asp-validation-summary="All" class="validation-summary"></div><input asp-for="Input.Id" type="hidden"/><input type="hidden" name="Input.Version" value="@Model.Input.Version?.ToString("O")"/><div class="field"><label asp-for="Input.Comment">Comment (required for rejection)</label><textarea asp-for="Input.Comment" maxlength="1000" class="form-control"></textarea></div><div class="form-actions"><button name="Input.Decision" value="Approved" class="btn btn-primary">Approve</button><button name="Input.Decision" value="Rejected" class="btn btn-outline-danger">Reject</button></div></form>}else{<p class="alert alert-info">Read only. This request is completed, closed, or unavailable for your role. Managers cannot approve their own projects.</p>}
 <a asp-action="Index" class="btn btn-outline-secondary mt-3">Back</a>
