@@ -69,6 +69,8 @@ public sealed class ProjectSqlTests
             await using var clean = NewContext();
             var ids = clean.AppUsers.Where(x => x.DomainLogin.StartsWith(Login)).Select(x => x.Id);
             var projectIds=clean.Projects.Where(x=>ids.Contains(x.ProjectManagerId) || (x.CreatedByUserId.HasValue && ids.Contains(x.CreatedByUserId.Value))).Select(x=>x.Id);
+            await clean.NotificationOutbox.Where(x => projectIds.Contains(x.ProjectId) || ids.Contains(x.TargetUserId) || ids.Contains(x.ActorUserId)).ExecuteDeleteAsync();
+            await clean.AppUsers.Where(x => x.NotificationApproverId.HasValue && ids.Contains(x.NotificationApproverId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.NotificationApproverId, (int?)null));
             await clean.ProjectAttachments.Where(x=>projectIds.Contains(x.ProjectId) || ids.Contains(x.UploadedByUserId)).ExecuteDeleteAsync();
             await clean.AuditLogs.Where(x => ids.Contains(x.ChangedByUserId) || (x.EntityType=="Project" && projectIds.Contains(x.EntityId)) || (x.EntityType=="ProjectProduct" && clean.ProjectProducts.Any(p=>p.Id==x.EntityId && projectIds.Contains(p.ProjectId)))).ExecuteDeleteAsync();
             await clean.ImplementationApprovals.Where(x=>ids.Contains(x.RequestedByUserId) || (x.ReviewerId.HasValue && ids.Contains(x.ReviewerId.Value)) || projectIds.Contains(x.ProjectProduct.ProjectId)).ExecuteDeleteAsync();

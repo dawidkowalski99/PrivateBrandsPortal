@@ -41,6 +41,15 @@ builder.Services.Configure<DemoAccessOptions>(builder.Configuration.GetSection("
 builder.Services.AddScoped<DemoAccess>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ManagerAuthorization>();
 
+builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection("Notifications"))
+    .ValidateDataAnnotations()
+    .Validate(o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out var uri) && uri.Scheme == "https" &&
+        string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment) && o.BaseUrl.EndsWith('/'),
+        "Notifications:BaseUrl must be an HTTPS base URL ending with /.")
+    .ValidateOnStart();
+builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+builder.Services.AddScoped<NotificationDispatcher>();
+builder.Services.AddHostedService<NotificationWorker>();
 builder.Services.AddScoped<ProjectAccessFilter>();
 builder.Services.AddSingleton<WizardStore>();
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();

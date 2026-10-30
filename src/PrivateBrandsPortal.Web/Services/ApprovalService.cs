@@ -99,6 +99,10 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
             Reason=project.RequiresManagerApproval ? null : "Project created by authorized Manager; separate manager approval not required." });
         await db.SaveChangesAsync(ct);
 
+        await WorkflowNotifications.EnqueueAsync(db, id, null,
+            project.RequiresManagerApproval ? "ProjectSubmitted" : "ProjectApprovalBypassed", user.Id, now,
+            project.RequiresManagerApproval ? NotificationAudience.Approver : NotificationAudience.ProjectManager,
+            null, project.RequiresManagerApproval ? $"Approvals/Review/{id}" : null, ct);
         await tx.CommitAsync(ct);
     }
     private DateTimeOffset Later(DateTimeOffset version) { var now = clock.GetUtcNow(); return now > version ? now : version.AddTicks(1); }
@@ -172,6 +176,8 @@ public sealed class ApprovalService(ApplicationDbContext db, IAppUserService use
         var statuses = await db.ProjectProducts.AsNoTracking().Where(x => x.ProjectId == input.ProjectId).Select(x => x.ReviewStatus).ToListAsync(ct);
         await db.Projects.Where(x => x.Id == input.ProjectId).ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, CalculateStatus(statuses)), ct);
         await CommercialService.ArchiveIfCompleteAsync(db, input.ProjectId, now, ct);
+        await WorkflowNotifications.EnqueueAsync(db, input.ProjectId, product.Id, $"Product{input.Decision}", user.Id, now,
+            NotificationAudience.ProjectManager, string.Join(" — ", new[] { rejection?.Name, input.Comment }.Where(x => !string.IsNullOrWhiteSpace(x))), null, ct);
         await tx.CommitAsync(ct);
     }
 }

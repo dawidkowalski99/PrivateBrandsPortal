@@ -47,6 +47,8 @@ public sealed class CustomerClosureService(ApplicationDbContext db,IAppUserServi
             ChangedByUserId=actor.Id,ChangedAtUtc=now,ChangeType=AuditChangeType.Updated});
         await db.SaveChangesAsync(ct);
         var archived=await CommercialService.ArchiveIfCompleteAsync(db,input.ProjectId,now,ct)>0;
+        await WorkflowNotifications.EnqueueAsync(db, input.ProjectId, product.Id, "ProductRejectedByCustomer", actor.Id, now,
+            NotificationAudience.ProjectManager, string.Join(" — ", new[] { reason.Name, product.CustomerRejectionComment }.Where(x => !string.IsNullOrWhiteSpace(x))), null, ct);
         await tx.CommitAsync(ct);return new(reason.Name,archived);
     }
 }

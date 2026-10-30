@@ -68,9 +68,37 @@ WHILE @@FETCH_STATUS=0 BEGIN
  SELECT @parent=Id FROM @Countries WHERE Code=@code;
  SELECT @count=COUNT(*),@id=MIN(Id) FROM #Names WHERE Kind=2 AND Name=@name COLLATE Latin1_General_100_CI_AS;
  IF @count>1 THROW 51000,'Customer dictionary conflict: duplicate normalized names.',1;
- IF @count=1 AND EXISTS(SELECT 1 FROM Customers WHERE Id=@id AND DefaultCountryId IS NOT NULL AND DefaultCountryId<>@parent) THROW 51000,'Customer default country conflicts with the requested mapping.',1;
- IF @count=0 INSERT Customers(Name,DefaultCountryId,IsActive,DisplayOrder,CreatedAtUtc,UpdatedAtUtc) VALUES(@name,@parent,1,@sort,@now,@now);
- ELSE UPDATE Customers SET DefaultCountryId=COALESCE(DefaultCountryId,@parent),IsActive=1,DisplayOrder=@sort,UpdatedAtUtc=@now WHERE Id=@id;
+EXEC sys.sp_executesql
+    N'
+IF @p_count = 1 AND EXISTS (
+    SELECT 1
+    FROM Customers
+    WHERE Id = @p_id
+      AND DefaultCountryId IS NOT NULL
+      AND DefaultCountryId <> @p_parent
+)
+    THROW 51000, ''Customer default country conflicts with the requested mapping.'', 1;
+
+IF @p_count = 0
+    INSERT Customers
+        (Name, DefaultCountryId, IsActive, DisplayOrder, CreatedAtUtc, UpdatedAtUtc)
+    VALUES
+        (@p_name, @p_parent, 1, @p_sort, @p_now, @p_now);
+ELSE
+    UPDATE Customers
+    SET DefaultCountryId = COALESCE(DefaultCountryId, @p_parent),
+        IsActive = 1,
+        DisplayOrder = @p_sort,
+        UpdatedAtUtc = @p_now
+    WHERE Id = @p_id;
+',
+    N'@p_count int, @p_id int, @p_parent int, @p_name nvarchar(200), @p_sort int, @p_now datetimeoffset',
+    @p_count = @count,
+    @p_id = @id,
+    @p_parent = @parent,
+    @p_name = @name,
+    @p_sort = @sort,
+    @p_now = @now;
  FETCH NEXT FROM customers_cursor INTO @name,@code,@sort;
 END
 CLOSE customers_cursor;DEALLOCATE customers_cursor;

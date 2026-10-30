@@ -56,6 +56,12 @@ public sealed class CommercialService(ApplicationDbContext db, IAppUserService u
         product.CommercialStatus=input.Status; product.UpdatedAtUtc=now;
         await db.SaveChangesAsync(ct);
         await ArchiveIfCompleteAsync(db,input.ProjectId,now,ct);
+        var requestId = input.Status == CommercialStatus.ImplementationIntoProduction
+            ? await db.ImplementationApprovals.Where(x => x.ProjectProductId == product.Id).OrderByDescending(x => x.Id).Select(x => x.Id).FirstAsync(ct) : (int?)null;
+        await WorkflowNotifications.EnqueueAsync(db, input.ProjectId, product.Id,
+            requestId.HasValue ? "ImplementationRequested" : $"CommercialStatus:{input.Status}", owner, now,
+            requestId.HasValue ? NotificationAudience.ImplementationApprover : NotificationAudience.ProjectManager,
+            null, requestId.HasValue ? $"Implementation/Review/{requestId}" : null, ct);
         await tx.CommitAsync(ct);
     }
     public static Task<int> ArchiveIfCompleteAsync(ApplicationDbContext db,int id,DateTimeOffset now,CancellationToken ct) =>

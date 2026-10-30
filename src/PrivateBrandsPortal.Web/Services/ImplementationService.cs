@@ -53,7 +53,10 @@ public sealed class ImplementationService(ApplicationDbContext db,IAppUserServic
         if(input.Decision==ImplementationApprovalStatus.Approved)await AttachmentService.RequireSalesDocumentsAsync(db,projectId.Value,approval.ProjectProductId,ct);
         approval.Status=input.Decision.Value;approval.ReviewerId=user.Id;approval.ReviewedAtUtc=now;approval.Comment=comment;
         Audit(db,approval.ProjectProductId,input.Decision==ImplementationApprovalStatus.Approved?"ImplementationApproved":"ImplementationRejected",user.Id,now,comment);
-        await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+        await db.SaveChangesAsync(ct);
+        await WorkflowNotifications.EnqueueAsync(db, projectId.Value, approval.ProjectProductId,
+            $"Implementation{input.Decision}", user.Id, now, NotificationAudience.ProjectManager, comment, null, ct);
+        await tx.CommitAsync(ct);
     }
     public async Task ResubmitAsync(int projectId,int productId,DateTimeOffset version,CancellationToken ct)
     {
@@ -66,6 +69,10 @@ public sealed class ImplementationService(ApplicationDbContext db,IAppUserServic
         var last=await db.ImplementationApprovals.Where(x=>x.ProjectProductId==productId).OrderByDescending(x=>x.Id).Select(x=>(ImplementationApprovalStatus?)x.Status).FirstOrDefaultAsync(ct);
         if(last is not (null or ImplementationApprovalStatus.Rejected))throw new ValidationException("Only rejected or historical requests can be submitted.");
         await AttachmentService.RequireSalesDocumentsAsync(db,projectId,productId,ct);Request(db,productId,user.Id,now,last is not null);
-        await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+        await db.SaveChangesAsync(ct);
+        var requestId = await db.ImplementationApprovals.Where(x => x.ProjectProductId == productId).OrderByDescending(x => x.Id).Select(x => x.Id).FirstAsync(ct);
+        await WorkflowNotifications.EnqueueAsync(db, projectId, productId, "ImplementationResubmitted", user.Id, now,
+            NotificationAudience.ImplementationApprover, null, $"Implementation/Review/{requestId}", ct);
+        await tx.CommitAsync(ct);
     }
 }

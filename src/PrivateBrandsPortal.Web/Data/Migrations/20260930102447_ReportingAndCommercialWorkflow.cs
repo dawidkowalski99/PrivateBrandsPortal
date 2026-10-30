@@ -55,7 +55,8 @@ namespace PrivateBrandsPortal.Web.Data.Migrations
                 maxLength: 100,
                 nullable: true);
 
-            migrationBuilder.Sql("UPDATE p SET Subcategory = t.Name FROM ProjectProducts p JOIN ProductTypes t ON t.Id = p.ProductTypeId WHERE p.Subcategory IS NULL;");
+            migrationBuilder.Sql(
+    "EXEC(N'UPDATE p SET Subcategory = t.Name FROM ProjectProducts p JOIN ProductTypes t ON t.Id = p.ProductTypeId WHERE p.Subcategory IS NULL;');");
 
             migrationBuilder.AddColumn<int>(
                 name: "RejectionReasonId",

@@ -57,6 +57,8 @@ public sealed class ProjectTransferService(ApplicationDbContext db, IAppUserServ
             OldValue = Identity(project.ProjectManager), NewValue = Identity(target), ChangedByUserId = actor.Id,
             ChangedAtUtc = now, ChangeType = AuditChangeType.ProjectReassigned, Reason = input.Reason });
         await db.SaveChangesAsync(ct);
+        await WorkflowNotifications.EnqueueAsync(db, project.Id, null, "ProjectManagerChanged", actor.Id, now,
+            NotificationAudience.ProjectManager, input.Reason, null, ct);
         await tx.CommitAsync(ct);
     }
 }

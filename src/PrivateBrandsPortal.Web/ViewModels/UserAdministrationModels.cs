@@ -10,6 +10,8 @@ public sealed class UserEditInput
     [Required, StringLength(200), Display(Name="Display Name")] public string DisplayName { get; set; } = "";
     [EnumDataType(typeof(AppRole))] public AppRole Role { get; set; }
     [Display(Name = "Active")] public bool IsActive { get; set; }
+    [EmailAddress, StringLength(256)] public string? Email { get; set; }
+    [Range(1, int.MaxValue), Display(Name = "Notification approver")] public int? NotificationApproverId { get; set; }
     public List<int> PermissionIds { get; set; } = [];
 }
 public sealed class UserCreateInput
@@ -19,11 +21,14 @@ public sealed class UserCreateInput
     [Required, StringLength(200), Display(Name="Display Name")] public string DisplayName { get; set; } = "";
     [Required, EnumDataType(typeof(AppRole))] public AppRole? Role { get; set; } = AppRole.ProjectManager;
     [Display(Name="Active")] public bool IsActive { get; set; } = true;
+    [EmailAddress, StringLength(256)] public string? Email { get; set; }
+    [Range(1, int.MaxValue), Display(Name = "Notification approver")] public int? NotificationApproverId { get; set; }
     public List<int> PermissionIds { get; set; } = [];
 }
 public sealed class UserCreatePage
 {
     public UserCreateInput Input { get; set; } = new();
+    public IReadOnlyList<LookupItem> NotificationApprovers { get; init; } = [];
     public bool CanAssignSuperAdmin { get; init; }
     public IReadOnlyList<PermissionOption> Permissions { get; init; } = [];
 }
@@ -36,6 +41,7 @@ public sealed class UserEditPage
     public required UserEditInput Input { get; set; }
     public required string DomainLogin { get; init; }
     public required string DisplayName { get; init; }
+    public IReadOnlyList<LookupItem> NotificationApprovers { get; init; } = [];
     public bool CanAssignSuperAdmin { get; init; }
     public required IReadOnlyList<PermissionOption> Permissions { get; init; }
 }

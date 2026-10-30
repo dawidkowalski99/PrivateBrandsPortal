@@ -7,6 +7,8 @@ public sealed class AppUser
     public int Id { get; set; }
     public required string DomainLogin { get; set; }
     public required string DisplayName { get; set; }
+    public int? NotificationApproverId { get; set; }
+    public AppUser? NotificationApprover { get; set; }
     public string? Email { get; set; }
     public string? Department { get; set; }
     public AppRole Role { get; set; } = AppRole.ProjectManager;

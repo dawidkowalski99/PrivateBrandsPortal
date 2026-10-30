@@ -8,6 +8,11 @@
 <div class="field"><label asp-for="Input.DisplayName"></label><input asp-for="Input.DisplayName" class="form-control" required maxlength="200"/><span asp-validation-for="Input.DisplayName"></span></div><div class="field"><label asp-for="Input.Role"></label><select asp-for="Input.Role" class="form-select">
 @foreach(var role in Enum.GetValues<AppRole>().Where(x=>Model.CanAssignSuperAdmin || x!=AppRole.SuperAdmin)){<option value="@role">@EnumLabel.Text(role)</option>}
 </select></div><label class="mt-4"><input asp-for="Input.IsActive"/> Active</label>
+<fieldset class="mt-4"><legend>Email notifications</legend>
+<div class="field"><label asp-for="Input.Email"></label><input asp-for="Input.Email" class="form-control" type="email" maxlength="256"/><span asp-validation-for="Input.Email"></span></div>
+<div class="field"><label asp-for="Input.NotificationApproverId"></label><select asp-for="Input.NotificationApproverId" class="form-select"><option value="">Not assigned</option>@foreach(var approver in Model.NotificationApprovers){<option value="@approver.Id">@approver.Name</option>}</select><span asp-validation-for="Input.NotificationApproverId"></span></div>
+<p>Routes review notifications for projects owned by this user. Does not grant access. Missing email or approver does not block project workflow. Managers cannot approve their own implementation.</p>
+</fieldset>
 <fieldset class="mt-4"><legend>Permissions</legend><p>SuperAdmin receives all administrative permissions automatically. SuperAdmin can also use both business workflows; project ownership rules still apply.</p>
 @foreach(var permission in Model.Permissions){<label class="d-block mb-3"><input type="checkbox" name="Input.PermissionIds" value="@permission.Id" checked="@(Model.Input.PermissionIds.Contains(permission.Id))" disabled="@(!permission.IsActive)"/> @permission.Name @if(!permission.IsActive){<small>(inactive)</small>}</label>}
 </fieldset><div class="form-actions"><a asp-action="Index" class="btn btn-outline-secondary">Cancel</a><button type="submit" class="btn btn-primary">Save</button></div></form>

@@ -1084,3 +1084,7 @@ closure have audit entries.
 
 Successful delivery and product rejection use single-use WorkflowUiEvent TempData feedback.
 The two events are SalesAndDeliveryCompleted and CustomerRejected. Effects start only on a visible page after successful POST/Redirect, last about 2.2 seconds, do not repeat on refresh, do not block interaction or create scrollbars, and respect prefers-reduced-motion.
+
+## Workflow notification outbox
+
+DEV implementation and manual verification: [docs/notifications.md](docs/notifications.md). No real e-mail transport is configured; the worker is disabled by default.

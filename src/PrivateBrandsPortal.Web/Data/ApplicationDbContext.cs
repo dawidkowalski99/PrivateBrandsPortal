@@ -4,6 +4,7 @@ namespace PrivateBrandsPortal.Web.Data;
 
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
+    public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
     public DbSet<CustomerRejectionReason> CustomerRejectionReasons => Set<CustomerRejectionReason>();
     public DbSet<ImplementationApproval> ImplementationApprovals => Set<ImplementationApproval>();
     public DbSet<FormulaOption> FormulaOptions => Set<FormulaOption>();
@@ -30,6 +31,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<AppUser>().HasOne(x => x.NotificationApprover).WithMany().HasForeignKey(x => x.NotificationApproverId).OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<Project>().HasOne(x=>x.CreatedByUser).WithMany().HasForeignKey(x=>x.CreatedByUserId).OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProjectProduct>().HasOne(x=>x.FormulaOption).WithMany().HasForeignKey(x=>x.FormulaOptionId).OnDelete(DeleteBehavior.NoAction);
         modelBuilder.HasSequence<long>("ProjectNumberSequence", "dbo")
