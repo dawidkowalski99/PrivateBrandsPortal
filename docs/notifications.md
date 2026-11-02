@@ -37,8 +37,7 @@ NotificationOutbox contains event/recipient snapshots, project/product identifie
 relative link, status, attempt count, next attempt time, sent/processed time and safe last error.
 Payload contains project number, customer, SKU, event, actor, reason/comment and UTC occurrence time.
 Snapshot IDs intentionally have no business foreign keys, so business-row deletion cannot erase
-notification history. Protect message content like AuditLogs. Logs contain IDs and error types,
-not addresses, message bodies, credentials or arbitrary sender exception messages.
+notification history. Protect message content like AuditLogs. Operational diagnostics contain IDs, recipient addresses and error types; use access-controlled retention. They do not contain message bodies, credentials or arbitrary sender exception messages.
 
 Enqueue requires the existing business transaction and uses its DbContext before CommitAsync.
 Outbox persistence failure rolls back the business transaction; external sender failure happens
@@ -73,7 +72,7 @@ This provides durable at-least-once delivery, application deduplication and seri
 A generic SMTP Outbox cannot promise exactly-once delivery if a process dies after provider
 acceptance but before persisting Sent. Future real senders should support durable provider-side
 idempotency using the provided key. A Message-ID header alone is not an exactly-once guarantee.
-No SMTP/Graph integration or credentials are configured in this change.
+Graph transport is now available as an optional provider; see [graph-email.md](graph-email.md). No real credentials are configured.
 
 ## DEV manual verification
 

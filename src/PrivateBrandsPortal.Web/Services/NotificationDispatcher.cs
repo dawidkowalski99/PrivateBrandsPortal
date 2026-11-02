@@ -53,6 +53,8 @@ public sealed class NotificationDispatcher(ApplicationDbContext db, IEmailSender
             row.Attempts++; row.LastAttemptAtUtc = clock.GetUtcNow(); row.Status = NotificationStatus.Processing;
             row.NextAttemptAtUtc = clock.GetUtcNow().AddMinutes(2);
             await db.SaveChangesAsync(ct);
+            logger.LogInformation("Notification {Id} event {EventType} attempt {Attempt} to {Recipient} started.", row.Id, row.EventType, row.Attempts, row.RecipientEmail);
+            using var logScope = logger.BeginScope(new Dictionary<string, object> { ["OutboxId"] = row.Id, ["EventType"] = row.EventType });
             try {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(TimeSpan.FromSeconds(30));
@@ -65,15 +67,21 @@ public sealed class NotificationDispatcher(ApplicationDbContext db, IEmailSender
                 row.SentAtUtc = result == EmailSendResult.Delivered ? clock.GetUtcNow() : null;
                 row.LastError = null;
                 await db.SaveChangesAsync(ct);
+                logger.LogInformation("Notification {Id} event {EventType} to {Recipient} completed as {Status}.", row.Id, row.EventType, row.RecipientEmail, row.Status);
                 return true;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex) {
                 row.Status = row.Attempts >= options.Value.MaxAttempts ? NotificationStatus.Failed : NotificationStatus.Retry;
                 // Sender exception messages can contain credentials or recipient addresses; persist only safe diagnostics.
-                row.LastError = $"Delivery failed ({ex.GetType().Name}); retry uses the same idempotency key.";
+                row.LastError = ex is EmailDeliveryException safe ? safe.Message[..Math.Min(500, safe.Message.Length)] : $"Delivery failed ({ex.GetType().Name}); retry uses the same idempotency key.";
                 row.NextAttemptAtUtc = clock.GetUtcNow().AddSeconds(Math.Min(3600, options.Value.RetrySeconds * Math.Pow(2, row.Attempts - 1)));
-                logger.LogWarning("Notification {Id} attempt {Attempt} failed ({ErrorType}).", row.Id, row.Attempts, ex.GetType().Name);
+                if (ex is EmailDeliveryException { RetryAfter: { } retryAfter } && retryAfter > TimeSpan.Zero) {
+                    var now = clock.GetUtcNow();
+                    var suggested = retryAfter > DateTimeOffset.MaxValue - now ? DateTimeOffset.MaxValue : now.Add(retryAfter);
+                    if (suggested > row.NextAttemptAtUtc) row.NextAttemptAtUtc = suggested;
+                }
+                logger.LogWarning("Notification {Id} event {EventType} to {Recipient} attempt {Attempt} failed ({ErrorType}).", row.Id, row.EventType, row.RecipientEmail, row.Attempts, ex.GetType().Name);
                 await db.SaveChangesAsync(ct); return false;
             }
         }

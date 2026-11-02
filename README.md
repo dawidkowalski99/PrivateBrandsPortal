@@ -1088,3 +1088,7 @@ The two events are SalesAndDeliveryCompleted and CustomerRejected. Effects start
 ## Workflow notification outbox
 
 DEV implementation and manual verification: [docs/notifications.md](docs/notifications.md). No real e-mail transport is configured; the worker is disabled by default.
+
+## Microsoft Graph email provider
+
+See [docs/graph-email.md](docs/graph-email.md) for certificate-based app-only configuration, DEV/PROD examples and the separately authorized first live test. DEV remains Simulated; no real mail is sent by tests.

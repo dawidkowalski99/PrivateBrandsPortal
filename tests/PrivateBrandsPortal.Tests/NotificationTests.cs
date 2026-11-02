@@ -226,4 +226,27 @@ public sealed class NotificationTests
         form=(await service.GetAsync(uid,default))!;form.Input.NotificationApproverId=uid;
         await Assert.ThrowsAsync<ValidationException>(()=>service.SaveAsync(form.Input,default));
     }
+    [Theory][InlineData(202)][InlineData(429)][InlineData(500)][InlineData(401)]
+    public async Task Graph_transport_result_uses_existing_outbox_status_and_retry(int code) {
+        await using var s=new ProjectSqlTests.Scope();await using var reviewer=new ProjectSqlTests.Scope();await Route(s,reviewer);
+        var id=await Submit(s);var row=await Row(s,id,"ProjectSubmitted");
+        var handler=new GraphEmailSenderTests.Handler(async(request,ct)=>{
+            var payload=await request.Content!.ReadAsStringAsync(ct);
+            using var json=System.Text.Json.JsonDocument.Parse(payload);
+            var mail=json.RootElement.GetProperty("message");
+            Assert.Equal(row.RecipientEmail,mail.GetProperty("toRecipients")[0].GetProperty("emailAddress").GetProperty("address").GetString());
+            Assert.Contains($"https://portalmp.forte.local/Approvals/Review/{id}",mail.GetProperty("body").GetProperty("content").GetString());
+            var response=new HttpResponseMessage((System.Net.HttpStatusCode)code);
+            if(code==429)response.Headers.RetryAfter=new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMinutes(5));
+            return response;
+        });
+        using var http=new HttpClient(handler);await using var db=s.NewContext();
+        var before=DateTimeOffset.UtcNow;
+        var result=await Dispatcher(db,GraphEmailSenderTests.Sender(http)).ProcessAsync(row.Id,default);
+        var after=await Row(s,id,"ProjectSubmitted");Assert.Equal(1,handler.Calls);Assert.Equal(1,after.Attempts);
+        Assert.Equal(code==202,result);Assert.Equal(code==202?NotificationStatus.Sent:NotificationStatus.Retry,after.Status);
+        if(code==202)Assert.NotNull(after.SentAtUtc);else Assert.Contains(code.ToString(),after.LastError);
+        if(code==429)Assert.True(after.NextAttemptAtUtc>=before.AddMinutes(5));
+        Assert.Equal(ProjectStatus.AwaitingManagerReview,(await s.Projects.DetailsAsync(id))!.Status);
+    }
 }

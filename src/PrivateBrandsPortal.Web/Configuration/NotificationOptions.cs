@@ -3,6 +3,8 @@ namespace PrivateBrandsPortal.Web.Configuration;
 
 public sealed class NotificationOptions
 {
+    public string EmailProvider { get; set; } = "Simulated";
+    public string FromAddress { get; set; } = "";
     public bool WorkerEnabled { get; set; }
     public string BaseUrl { get; set; } = "https://portalmp.forte.local/";
     [Range(1, 300)] public int PollSeconds { get; set; } = 15;

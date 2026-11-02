@@ -109,6 +109,8 @@ public sealed class AuthenticatedFactory : WebApplicationFactory<Program>
     {
         builder.ConfigureServices(services =>
         {
+            // Host integration tests must never start delivery, even with inherited Graph settings.
+            services.PostConfigure<NotificationOptions>(o => { o.EmailProvider = "Simulated"; o.WorkerEnabled = false; });
             // TestServer has no real connection context required by Negotiate.
             // Windows SSO is verified separately against the actual Kestrel host.
             services.RemoveAll<IConfigureOptions<AuthenticationOptions>>();

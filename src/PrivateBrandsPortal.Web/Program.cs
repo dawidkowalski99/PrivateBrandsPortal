@@ -47,7 +47,7 @@ builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.Ge
         string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment) && o.BaseUrl.EndsWith('/'),
         "Notifications:BaseUrl must be an HTTPS base URL ending with /.")
     .ValidateOnStart();
-builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+builder.Services.AddPortalEmail(builder.Configuration);
 builder.Services.AddScoped<NotificationDispatcher>();
 builder.Services.AddHostedService<NotificationWorker>();
 builder.Services.AddScoped<ProjectAccessFilter>();
