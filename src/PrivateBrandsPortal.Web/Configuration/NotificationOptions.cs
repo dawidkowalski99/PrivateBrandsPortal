@@ -3,6 +3,7 @@ namespace PrivateBrandsPortal.Web.Configuration;
 
 public sealed class NotificationOptions
 {
+    public string TimeZone { get; set; } = "Central European Standard Time";
     public string EmailProvider { get; set; } = "Simulated";
     public string FromAddress { get; set; } = "";
     public bool WorkerEnabled { get; set; }

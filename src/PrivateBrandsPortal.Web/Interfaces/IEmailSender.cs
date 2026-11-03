@@ -1,5 +1,5 @@
 namespace PrivateBrandsPortal.Web.Interfaces;
-public sealed record EmailMessage(string IdempotencyKey, string To, string Subject, string TextBody);
+public sealed record EmailMessage(string IdempotencyKey, string To, string Subject, string TextBody, string? HtmlBody = null);
 public enum EmailSendResult { Delivered, Simulated }
 public interface IEmailSender
 {

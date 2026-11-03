@@ -58,10 +58,8 @@ public sealed class NotificationDispatcher(ApplicationDbContext db, IEmailSender
             try {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(TimeSpan.FromSeconds(30));
-                var baseUri = new Uri(options.Value.BaseUrl, UriKind.Absolute);
-                var link = new Uri(baseUri, row.RelativePath).AbsoluteUri;
-                var result = await sender.SendAsync(new(row.EventKey, row.RecipientEmail!, row.Subject,
-                    row.Body + "\nOpen: " + link), timeout.Token);
+                var message = NotificationEmailRenderer.Render(row, options.Value);
+                var result = await sender.SendAsync(message, timeout.Token);
                 row.Status = result == EmailSendResult.Delivered ? NotificationStatus.Sent : NotificationStatus.Simulated;
                 row.ProcessedAtUtc = clock.GetUtcNow();
                 row.SentAtUtc = result == EmailSendResult.Delivered ? clock.GetUtcNow() : null;

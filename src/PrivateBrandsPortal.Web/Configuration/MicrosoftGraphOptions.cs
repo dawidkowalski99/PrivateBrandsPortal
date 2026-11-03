@@ -18,6 +18,10 @@ public static class EmailProviderConfiguration
     public static IReadOnlyList<string> Errors(NotificationOptions notifications, MicrosoftGraphOptions graph)
     {
         var errors = new List<string>();
+        try { TimeZoneInfo.FindSystemTimeZoneById(notifications.TimeZone); }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException or ArgumentException) {
+            errors.Add("Notifications:TimeZone must identify a valid time zone.");
+        }
         if (!IsGraph(notifications)) {
             if (!string.Equals(notifications.EmailProvider, "Simulated", StringComparison.OrdinalIgnoreCase)) errors.Add("Notifications:EmailProvider must be Simulated or Graph.");
             return errors;

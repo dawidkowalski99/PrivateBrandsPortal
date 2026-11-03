@@ -24,7 +24,7 @@ public sealed class GraphEmailSender(HttpClient http, IGraphTokenProvider tokens
             request.Headers.Add("client-request-id", Guid.NewGuid().ToString());
             request.Content = JsonContent.Create(new {
                 message = new {
-                    subject = message.Subject, body = new { contentType = "Text", content = message.TextBody },
+                    subject = message.Subject, body = new { contentType = message.HtmlBody is null ? "Text" : "HTML", content = message.HtmlBody ?? message.TextBody },
                     toRecipients = new[] { new { emailAddress = new { address = message.To } } }
                 }, saveToSentItems = true
             });

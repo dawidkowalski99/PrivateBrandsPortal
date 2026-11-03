@@ -51,15 +51,15 @@ public sealed class GraphEmailSenderTests
         var n=Notifications();var g=Graph();if(key=="FromAddress")n.FromAddress="";else typeof(MicrosoftGraphOptions).GetProperty(key)!.SetValue(g,"");
         Assert.Contains(EmailProviderConfiguration.Errors(n,g),x=>x.Contains(key));
     }
-    [Fact] public async Task Correct_request_uses_app_mailbox_recipient_subject_body_and_acceptance() {
-        var message=Message();var tokens=new Tokens();
+    [Theory][InlineData(false)][InlineData(true)] public async Task Correct_request_uses_app_mailbox_recipient_subject_body_and_acceptance(bool html) {
+        var message=Message() with { HtmlBody = html ? "<p>Produkt został zatwierdzony</p>" : null };var tokens=new Tokens();
         var handler=new Handler(async(r,ct)=>{
             Assert.Equal(HttpMethod.Post,r.Method);Assert.Equal("https://graph.microsoft.com/v1.0/users/portalmp%40forte-sweden.com/sendMail",r.RequestUri!.AbsoluteUri);
             Assert.Equal("Bearer",r.Headers.Authorization!.Scheme);Assert.Equal("fake-token-for-unit-test",r.Headers.Authorization.Parameter);
             using var body=JsonDocument.Parse(await r.Content!.ReadAsStringAsync(ct));var m=body.RootElement.GetProperty("message");
             Assert.Equal(message.To,m.GetProperty("toRecipients")[0].GetProperty("emailAddress").GetProperty("address").GetString());
-            Assert.Equal(message.Subject,m.GetProperty("subject").GetString());Assert.Equal(message.TextBody,m.GetProperty("body").GetProperty("content").GetString());
-            Assert.Equal("Text",m.GetProperty("body").GetProperty("contentType").GetString());Assert.True(body.RootElement.GetProperty("saveToSentItems").GetBoolean());
+            Assert.Equal(message.Subject,m.GetProperty("subject").GetString());Assert.Equal(message.HtmlBody ?? message.TextBody,m.GetProperty("body").GetProperty("content").GetString());
+            Assert.Equal(html ? "HTML" : "Text",m.GetProperty("body").GetProperty("contentType").GetString());Assert.True(body.RootElement.GetProperty("saveToSentItems").GetBoolean());
             return new(HttpStatusCode.Accepted);
         });using var http=new HttpClient(handler);
         Assert.Equal(EmailSendResult.Delivered,await Sender(http,tokens).SendAsync(message,default));Assert.Equal(1,handler.Calls);Assert.Equal(1,tokens.Calls);

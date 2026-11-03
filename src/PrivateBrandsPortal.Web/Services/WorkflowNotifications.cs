@@ -16,19 +16,20 @@ public static class WorkflowNotifications
         if (db.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Workflow notifications require the business transaction.");
         var project = await db.Projects.AsNoTracking().Where(x => x.Id == projectId)
-            .Select(x => new { x.ProjectNumber, x.Customer, x.ProjectManagerId }).SingleAsync(ct);
+            .Select(x => new { x.ProjectNumber, x.Customer, x.ProjectManagerId, Country = x.Country.Name, Manager = x.ProjectManager.DisplayName }).SingleAsync(ct);
         var actor = await db.AppUsers.AsNoTracking().Where(x => x.Id == actorId)
             .Select(x => x.DisplayName).SingleAsync(ct);
-        var sku = productId.HasValue ? await db.ProjectProducts.AsNoTracking().Where(x => x.Id == productId && x.ProjectId == projectId)
-            .Select(x => x.SKU).SingleAsync(ct) : null;
+        var product = productId.HasValue ? await db.ProjectProducts.AsNoTracking().Where(x => x.Id == productId && x.ProjectId == projectId)
+            .Select(x => new { x.SKU, Category = x.ProductCategory == null ? null : x.ProductCategory.Name, x.Subcategory }).SingleAsync(ct) : null;
         var identity = $"{eventType}|{projectId}|{productId}|{occurredAt.UtcTicks}|{audience}|{project.ProjectManagerId}";
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         if (db.NotificationOutbox.Local.Any(x => x.EventKey == key) || await db.NotificationOutbox.AnyAsync(x => x.EventKey == key, ct)) return;
         var row = new NotificationOutbox {
             EventKey = key, EventType = eventType, ProjectId = projectId, ProductId = productId,
             ActorUserId = actorId, TargetUserId = project.ProjectManagerId, Audience = audience,
-            Subject = $"{project.ProjectNumber} — {eventType}",
-            Body = $"Project: {project.ProjectNumber}\nCustomer: {project.Customer}\nEvent: {eventType}\nActor: {actor}\nSKU: {sku ?? "Whole project"}\nComment / reason: {comment ?? "—"}\nOccurred (UTC): {occurredAt:O}",
+            Subject = NotificationEmailRenderer.Subject(project.ProjectNumber, eventType),
+            Body = NotificationEmailRenderer.Serialize(new NotificationEmailData(project.ProjectNumber, project.Customer,
+                project.Country, project.Manager, actor, product?.SKU, product?.Category, product?.Subcategory, comment)),
             RelativePath = relativePath ?? $"Projects/Details/{projectId}",
             CreatedAtUtc = occurredAt, NextAttemptAtUtc = occurredAt, Status = NotificationStatus.Pending
         };

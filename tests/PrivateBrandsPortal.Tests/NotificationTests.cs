@@ -73,7 +73,8 @@ public sealed class NotificationTests
         await Approvals(reviewer).DecideAsync(form.Input);
         var row=await Row(s,project,$"Product{decision}");
         Assert.Equal((await s.Users.GetCurrentAsync()).Id,row.RecipientUserId);
-        Assert.Contains("Decision comment",row.Body);Assert.Contains("Customer:",row.Body);Assert.Contains("Actor:",row.Body);
+        var snapshot = NotificationEmailRenderer.ReadData(row);
+        Assert.Contains("Decision comment", snapshot.Comment);Assert.False(string.IsNullOrWhiteSpace(snapshot.Customer));Assert.False(string.IsNullOrWhiteSpace(snapshot.Actor));
         Assert.Equal($"Projects/Details/{project}",row.RelativePath);
     }
     [Fact]
@@ -211,7 +212,7 @@ public sealed class NotificationTests
         var form=(await closure.FormAsync(project,p.Products[1].Id,default))!;form.Input.ReasonId=form.Reasons.First().Id;
         form.Input.Confirm=true;form.Input.Comment="Customer ended this SKU";await closure.CloseAsync(form.Input,default);
         var row=await Row(s,project,"ProductRejectedByCustomer");Assert.Equal(uid,row.RecipientUserId);
-        Assert.Contains(form.Reasons.First().Name,row.Body);Assert.Contains(form.Input.Comment,row.Body);
+        Assert.Contains(form.Reasons.First().Name,NotificationEmailRenderer.ReadData(row).Comment);Assert.Contains(form.Input.Comment,NotificationEmailRenderer.ReadData(row).Comment);
     }
     [Fact]
     public async Task User_administration_saves_email_and_routing_with_audit_but_not_new_permissions() {
